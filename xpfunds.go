@@ -26,7 +26,7 @@ func get(url string) string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	req.Header.Add("Cookie", cookie)
+	req.Header.Add("Cookie", *cookie)
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Fatal(err)
@@ -55,6 +55,7 @@ func entities(html string, r *regexp.Regexp) []string {
 }
 
 func main() {
+	flag.Parse()
 	nameRegexp := regexp.MustCompile("<h2 class=\"fleft\">(.*)</h2>")
 	valuesRegexp := regexp.MustCompile("<td class=\"TD_blue\">(-?[0-9,]+)</td>")
 	for _, fund := range entities(get("https://portal.xpi.com.br/pages/fundos/tabela-rentabilidades.aspx"), regexp.MustCompile("<a href=\"(/pages/fundos/fundos-investimentos.aspx\\?F=[0-9]+)\">")) {
@@ -69,6 +70,6 @@ func main() {
 			}
 			prod *= 1.0 + v / 100.0
 		}
-		fmt.Printf("%s\t%.2f%%\n", name, (math.Pow(prod, 1.0 / (float64(len(values)) / 12.0)) - 1.0) * 100.0)
+		fmt.Printf("%s\t%d\t%.2f%%\n", name, len(values), (math.Pow(prod, 1.0 / (float64(len(values)) / 12.0)) - 1.0) * 100.0)
 	}
 }
