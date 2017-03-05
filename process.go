@@ -6,7 +6,7 @@ package main
 
 import (
 	"bufio"
-    "fmt"
+	"fmt"
 	"log"
 	"math"
 	"os"
@@ -40,22 +40,28 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("\t%d", cot + liq)
+		fmt.Printf("\t%d", cot+liq)
 		prod := 1.0
 		sum := 0.0
 		neg := 0
 		var values []float64
-		for i := 4; i < len(fields); i++ {
-			v, err := strconv.ParseFloat(strings.Replace(fields[i], ",", ".", 1), 64)
-			if err != nil {
-				log.Fatal(err)
-			}
-			v /= 100.0
-			prod *= 1.0 + v
-			sum += v
-			values = append(values, v)
-			if (v < 0) {
-				neg++
+		for year := (len(fields) - 4) / 12; year >= 0; year-- {
+			for month := 0; month < 12; month++ {
+				i := year*12 + month + 4
+				if i >= len(fields) {
+					break
+				}
+				v, err := strconv.ParseFloat(strings.Replace(fields[i], ",", ".", 1), 64)
+				if err != nil {
+					log.Fatal(err)
+				}
+				v /= 100.0
+				prod *= 1.0 + v
+				sum += v
+				values = append(values, v)
+				if v < 0 {
+					neg++
+				}
 			}
 		}
 		mean := sum / float64(len(values))
@@ -75,6 +81,6 @@ func main() {
 				}
 			}
 		}
-		fmt.Printf("\t%d\t%s\t%s%%\t%s%%\t%d\t%s%%\n", len(values), formatFloat(100.0 * math.Sqrt(total / float64(len(values)))), formatFloat(100.0 * float64(neg) / float64(len(values))), formatFloat((gd - 1.0) * 100.0), gds, formatFloat((math.Pow(prod, 1.0 / (float64(len(values)) / 12.0)) - 1.0) * 100.0))
+		fmt.Printf("\t%d\t%s\t%s%%\t%s%%\t%d\t%s%%\n", len(values), formatFloat(100.0*math.Sqrt(total/float64(len(values)))), formatFloat(100.0*float64(neg)/float64(len(values))), formatFloat((gd-1.0)*100.0), gds, formatFloat((math.Pow(prod, 1.0/(float64(len(values))/12.0))-1.0)*100.0))
 	}
 }
