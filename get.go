@@ -74,7 +74,7 @@ func main() {
 	flag.Parse()
 	nameR := regexp.MustCompile("<h2 class=\"fleft\">(.*)</h2>")
 	openR := regexp.MustCompile("(Quero aplicar agora)")
-	qualR := regexp.MustCompile("(qualificado)")
+	qualR := regexp.MustCompile("(ualificado)")
 	minPR := regexp.MustCompile("Aplicação Inicial Mínima")
 	minR := regexp.MustCompile("<div class=\"TB_EspacComp TB_EspacCompValor\">R\\$ ([0-9,.]*)</div>")
 	cotPR := regexp.MustCompile("Resgate - Cotização")
