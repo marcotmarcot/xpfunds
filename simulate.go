@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+var strat = minimumOnPastBest(100000)
+
 func main() {
 	r := bufio.NewReader(os.Stdin)
 	for true {
@@ -44,11 +46,13 @@ func main() {
 	}
 	fillTable()
 	fillMaxValidTimeTable()
-	cs := minimumOnPastBest(100000).choose(size, size/2)
-	for _, c := range cs {
-		fmt.Println(fs[c.i].name)
+	var total float64
+	for t := size - 1; t > 0; t-- {
+		cs := strat.choose(size, t)
+		fmt.Println(annual(max(t, 0), t), annual(profitability(cs, t, 0), t))
+		total += annual(max(t, 0), t) - annual(profitability(cs, t, 0), t)
 	}
-	fmt.Println(math.Pow(profitability(cs, size/2, 0), 1.0/float64(size/2)/12.0))
+	fmt.Println(total / float64(size - 1))
 }
 
 var (
@@ -81,17 +85,6 @@ func fillTable() {
 
 var table [][][]float64
 
-func max(start, end int) (value float64, index int) {
-	for fi := range fs {
-		if table[fi][start][end] < value {
-			continue
-		}
-		value = table[fi][start][end]
-		index = fi
-	}
-	return value, index
-}
-
 type strategy interface {
 	choose(start, end int) []*chosen
 }
@@ -109,6 +102,20 @@ func profitability(cs []*chosen, start, end int) float64 {
 		total += c.value
 	}
 	return prof / total
+}
+
+func annual(value float64, months int) float64 {
+	return math.Pow(value, 1.0/(float64(months)/12.0))
+}
+
+func max(start, end int) float64 {
+	value := 0.0
+	for fi := range fs {
+		if table[fi][start][end] > value {
+			value = table[fi][start][end]
+		}
+	}
+	return value
 }
 
 type minimumOnPastBest float64
