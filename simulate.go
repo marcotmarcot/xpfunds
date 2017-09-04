@@ -6,13 +6,13 @@ import (
 	"log"
 	"math"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
 
 func main() {
 	r := bufio.NewReader(os.Stdin)
-	var size int
 	for true {
 		line, err := r.ReadString('\n')
 		if err != nil {
@@ -42,11 +42,19 @@ func main() {
 			size = len(f.rend)
 		}
 	}
-	m, i := max(fs, size, 0)
-	fmt.Println(m, i)
+	fillTable()
+	fillMaxValidTimeTable()
+	cs := minimumOnPastBest(100000).choose(size, size/2)
+	for _, c := range cs {
+		fmt.Println(fs[c.i].name)
+	}
+	fmt.Println(math.Pow(profitability(cs, size/2, 0), 1.0/float64(size/2)/12.0))
 }
 
-var fs []*fund
+var (
+	fs []*fund
+	size int
+)
 
 type fund struct {
 	name string
@@ -54,50 +62,97 @@ type fund struct {
 	rend []float64
 }
 
-type pCacheI struct {
-	fi, start, end int
+func fillTable() {
+	table = make([][][]float64, len(fs))
+	for fi, f := range fs {
+		table[fi] = make([][]float64, size + 1)
+		for start := size; start > 0; start-- {
+			table[fi][start] = make([]float64, start)
+			if start > len(f.rend) {
+				continue
+			}
+			table[fi][start][start - 1] = f.rend[start - 1]
+			for end := start - 2; end >= 0; end-- {
+				table[fi][start][end] = table[fi][start][end + 1] * f.rend[end]
+			}
+		}
+	}
 }
 
-func max(fs []*fund, start, end int) (value float64, index int) {
+var table [][][]float64
+
+func max(start, end int) (value float64, index int) {
 	for fi := range fs {
-		p := profitability(fi, start, end)
-		if p < value {
+		if table[fi][start][end] < value {
 			continue
 		}
-		value = p
+		value = table[fi][start][end]
 		index = fi
 	}
 	return value, index
 }
 
-func profitability(fi int, start, end int) float64 {
-	pci := pCacheI{fi, start, end}
-	v, ok := pCache[pci]
-	if ok {
-		return v
-	}
-	p := 1.0
-	if start > len(fs[fi].rend) {
-		pCache[pci] = 0.0
-		return 0.0
-	}
-	for i := start - 1; i >= end; i-- {
-		p *= fs[fi].rend[i]
-	}
-	pCache[pci] = math.Pow(p, 1.0/(float64(start - end)/12.0))
-	return pCache[pci]
-}
-
-var pCache = make(map[pCacheI]float64)
-
 type strategy interface {
-	choose(fs []*fund, start, end int) []int
+	choose(start, end int) []*chosen
 }
 
-type current struct {}
+type chosen struct {
+	i int
+	value float64
+}
 
-func (c *current) choose(fs []*fund, start, end int) []int {
-	return nil
+func profitability(cs []*chosen, start, end int) float64 {
+	total := 0.0
+	prof := 0.0
+	for _, c := range cs {
+		prof += c.value * table[c.i][start][end]
+		total += c.value
+	}
+	return prof / total
+}
+
+type minimumOnPastBest float64
+
+func fillMaxValidTimeTable() {
+	maxValidTimeTable = make([][][]float64, len(fs))
+	for fi := range fs {
+		maxValidTimeTable[fi] = make([][]float64, size + 1)
+		for start := size; start > 0; start-- {
+			maxValidTimeTable[fi][start] = make([]float64, start)
+		}
+		for end := 0; end < size; end++ {
+			for start := end + 1; start <= size; start++ {
+				if table[fi][start][end] != 0 {
+					maxValidTimeTable[fi][start][end] = math.Pow(table[fi][start][end], 1.0/(float64(len(fs[fi].rend))/12.0))
+					continue
+				}
+				if start > end + 1 {
+					maxValidTimeTable[fi][start][end] = maxValidTimeTable[fi][start - 1][end]
+				}
+			}
+		}
+	}
+}
+
+var maxValidTimeTable [][][]float64
+
+func (m minimumOnPastBest) choose(start, end int) []*chosen {
+	is := make([]int, len(fs))
+	for i := range is {
+		is[i] = i
+	}
+	fisLessStart = start
+	fisLessEnd = end
+	sort.Sort(fis(is))
+	var cs []*chosen
+	money := float64(m)
+	for _, i := range is {
+		if money > fs[i].min {
+			cs = append(cs, &chosen{i, fs[i].min})
+		}
+		money -= fs[i].min
+	}
+	return cs
 }
 
 type fis []int
@@ -107,8 +162,9 @@ func (f fis) Len() int {
 }
 
 func (f fis) Less(i, j int) bool {
-	return profitability(f[i], fisLessStart, fisLessEnd) > profitability(f[j], fisLessStart, fisLessEnd)
+	return maxValidTimeTable[f[i]][fisLessStart][fisLessEnd] > maxValidTimeTable[f[j]][fisLessStart][fisLessEnd]
 }
+
 
 func (f fis) Swap(i, j int) {
 	f[i], f[j] = f[j], f[i]
