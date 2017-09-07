@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/rand"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
 )
-
-var strat = minimumOnPastBest(100000)
 
 func main() {
 	r := bufio.NewReader(os.Stdin)
@@ -46,13 +45,34 @@ func main() {
 	}
 	fillTable()
 	fillMaxValidTimeTable()
-	var total float64
-	for t := size - 1; t > 0; t-- {
-		cs := strat.choose(size, t)
-		fmt.Println(annual(max(t, 0), t), annual(profitability(cs, t, 0), t))
-		total += annual(max(t, 0), t) - annual(profitability(cs, t, 0), t)
+	strats := []*namedStrategy{
+		{"all", all{}},
+		{"min115000", minimumOnPastBest(115000)},
+		{"126,104,154", cnst([]int{126, 104, 154})},
 	}
-	fmt.Println(total / float64(size - 1))
+	for i := range fs {
+		strats = append(strats, &namedStrategy{"cnst" + strconv.Itoa(i), cnst([]int{i})})
+	}
+	for i := 1; i <= 20; i++ {
+		strats = append(strats, &namedStrategy{"top" + strconv.Itoa(i), top(i)})
+		strats = append(strats, &namedStrategy{"topMin" + strconv.Itoa(i), topMin(i)})
+		strats = append(strats, &namedStrategy{"random" + strconv.Itoa(i), random(i)})
+		strats = append(strats, &namedStrategy{"bottom" + strconv.Itoa(i), bottom(i)})
+	}
+	for _, strat := range strats {
+		var num float64
+		var den int
+		for t := size - 1; t > 0; t-- {
+			cs := strat.strat.choose(size, t)
+			p := profitability(cs, t, 0)
+			if p == 0 {
+				continue
+			}
+			num += (annual(max(t, 0), t) - annual(p, t)) * float64(t)
+			den += t
+		}
+		fmt.Printf("%v\t%v\n", strat.name, num / float64(den))
+	}
 }
 
 var (
@@ -87,6 +107,11 @@ var table [][][]float64
 
 type strategy interface {
 	choose(start, end int) []*chosen
+}
+
+type namedStrategy struct {
+	name string
+	strat strategy
 }
 
 type chosen struct {
@@ -154,9 +179,10 @@ func (m minimumOnPastBest) choose(start, end int) []*chosen {
 	var cs []*chosen
 	money := float64(m)
 	for _, i := range is {
-		if money > fs[i].min {
-			cs = append(cs, &chosen{i, fs[i].min})
+		if money < fs[i].min || maxValidTimeTable[i][start][end] == 0 {
+			break
 		}
+		cs = append(cs, &chosen{i, fs[i].min})
 		money -= fs[i].min
 	}
 	return cs
@@ -181,3 +207,96 @@ var (
 	fisLessStart int
 	fisLessEnd int
 )
+
+type cnst []int
+
+func (c cnst) choose(start, end int) []*chosen {
+	cs := make([]*chosen, len(c))
+	for i, fi := range c {
+		cs[i] = &chosen{int(fi), 1}
+	}
+	return cs
+}
+
+type top int
+
+func (t top) choose(start, end int) []*chosen {
+	is := make([]int, len(fs))
+	for i := range is {
+		is[i] = i
+	}
+	fisLessStart = start
+	fisLessEnd = end
+	sort.Sort(fis(is))
+	var cs []*chosen
+	for i := 0; i < len(fs) && len(cs) < int(t); i++ {
+		if maxValidTimeTable[is[i]][start][end] > 0 {
+			cs = append(cs, &chosen{is[i], 1})
+		}
+	}
+	return cs
+}
+
+type topMin int
+
+func (t topMin) choose(start, end int) []*chosen {
+	is := make([]int, len(fs))
+	for i := range is {
+		is[i] = i
+	}
+	fisLessStart = start
+	fisLessEnd = end
+	sort.Sort(fis(is))
+	var cs []*chosen
+	for i := 0; i < int(t); i++ {
+		cs = append(cs, &chosen{is[i], fs[is[i]].min})
+	}
+	return cs
+}
+
+type all struct{}
+
+func (a all) choose(start, end int) []*chosen {
+	var cs []*chosen
+	for i := 0; i < len(fs); i++ {
+		if maxValidTimeTable[i][start][end] > 0 {
+			cs = append(cs, &chosen{i, 1})
+		}
+	}
+	return cs
+}
+
+type random int
+
+func (r random) choose(start, end int) []*chosen {
+	var is []int
+	for i := 0; i < len(fs); i++ {
+		if maxValidTimeTable[i][start][end] > 0 {
+			is = append(is, i)
+		}
+	}
+	cs := make([]*chosen, int(r))
+	for i := 0; i < int(r); i++ {
+		cs[i] = &chosen{is[rand.Intn(len(is))], 1}
+	}
+	return cs
+}
+
+type bottom int
+
+func (b bottom) choose(start, end int) []*chosen {
+	is := make([]int, len(fs))
+	for i := range is {
+		is[i] = i
+	}
+	fisLessStart = start
+	fisLessEnd = end
+	sort.Sort(fis(is))
+	var cs []*chosen
+	for i := len(fs) - 1; i >= 0 && len(cs) < int(b); i-- {
+		if maxValidTimeTable[is[i]][start][end] > 0 {
+			cs = append(cs, &chosen{is[i], 1})
+		}
+	}
+	return cs
+}
