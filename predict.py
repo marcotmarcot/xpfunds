@@ -69,10 +69,9 @@ class OptimumFund:
         self.duration = f.duration
 
   def createAnnual(self, funds):
-    self.annual = []
+    self.annual = [[]] * (self.duration + 1)
     for start in range(self.duration + 1):
-      self.annual.append([0] * start)
-    for start in range(self.duration + 1):
+      self.annual[start] = [0] * start
       for end in range(start):
         max = 0
         for f in funds:
