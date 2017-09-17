@@ -27,12 +27,9 @@ def main():
   for f in funds:
     f.createAnnual(optimum.duration)
   optimum.createAnnual(funds)
-  print(optimum.annual[optimum.duration][0])
-  print(optimum.annual[optimum.duration - 1][0])
-  print('python')
-  print('PastBest', averageLoss(optimum, funds, PastBestStrategy(), money))
-  # for i in range(len(funds)):
-  #   print(i, averageLoss(optimum, funds, SingleFundStrategy(i), money))
+  print('PastBest', averageLoss(optimum, funds, PastBestStrategy(), money, optimum.duration, 0))
+  for i in range(len(funds)):
+    print(i, averageLoss(optimum, funds, SingleFundStrategy(i), money, optimum.duration, 0))
 
 
 class Fund:
@@ -88,11 +85,11 @@ class OptimumFund:
         self.annual[start][end] = max
 
 
-def averageLoss(optimum, funds, strategy, money):
+def averageLoss(optimum, funds, strategy, money, start, end):
   num = 0
   den = 0
-  for time in range(1, optimum.duration):
-    l = loss(optimum, funds, strategy, money, time)
+  for time in range(end + 1, start):
+    l = loss(optimum, funds, strategy, money, start, end, time)
     if l is None:
       continue
     num += time * l
@@ -102,33 +99,28 @@ def averageLoss(optimum, funds, strategy, money):
   return num / den * 100.0
 
 
-def loss(optimum, funds, strategy, money, time):
-  fis = strategy.select(optimum.duration, funds, money, time)
+def loss(optimum, funds, strategy, money, start, end, time):
+  fis = strategy.select(optimum, funds, money, start, time)
   num = 0
   den = 0
   for fi in fis:
     if time > funds[fi].duration:
       return None
-    print(funds[fi].min, funds[fi].table[time][0])
-    num += funds[fi].min * funds[fi].table[time][0]
+    num += funds[fi].min * funds[fi].table[time][end]
     den += funds[fi].min
-  print(optimum.annual[time][0])
-  print((num/den) ** (1.0/(time/12.0)))
-  print(optimum.annual[time][0] - (num/den) ** (1.0/(time/12.0)))
   return optimum.annual[time][0] - (num/den) ** (1.0/(time/12.0))
 
 
 class PastBestStrategy:
-  def select(self, max_time, funds, money, time):
+  def select(self, optimum, funds, money, start, end):
     fis = list(range(len(funds)))
-    fis = sorted(fis, key=lambda fi: -funds[fi].annual[max_time][time])
+    fis = sorted(fis, key=lambda fi: -funds[fi].annual[start][end])
     choice = []
     for fi in fis:
-      if funds[fi].annual[max_time][time] == 0 or funds[fi].min > money:
+      if funds[fi].annual[start][end] == 0 or funds[fi].min > money:
         break
       choice.append(fi)
       money -= funds[fi].min
-      print(fi, funds[fi].min, funds[fi].annual[max_time][time])
     return choice
 
 
@@ -136,7 +128,7 @@ class SingleFundStrategy:
   def __init__(self, fund):
     self.fund = fund
 
-  def select(self, max_time, funds, money, time):
+  def select(self, optimum, funds, money, start, end):
     return [self.fund]
 
 

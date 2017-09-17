@@ -47,19 +47,19 @@ func main() {
 	fillMaxValidTimeTable()
 	fmt.Println("go")
 	strats := []*namedStrategy{
-		// {"all", all{}},
+		{"all", all{}},
 		{"min115000", minimumOnPastBest(115000)},
-		// {"126,104,154", cnst([]int{126, 104, 154})},
+		{"126,104,154", cnst([]int{126, 104, 154})},
 	}
-	// for i := range fs {
-	// 	strats = append(strats, &namedStrategy{"cnst" + strconv.Itoa(i), cnst([]int{i})})
-	// }
-	// for i := 1; i <= 20; i++ {
-	// 	strats = append(strats, &namedStrategy{"top" + strconv.Itoa(i), top(i)})
-	// 	strats = append(strats, &namedStrategy{"topMin" + strconv.Itoa(i), topMin(i)})
-	// 	strats = append(strats, &namedStrategy{"random" + strconv.Itoa(i), random(i)})
-	// 	strats = append(strats, &namedStrategy{"bottom" + strconv.Itoa(i), bottom(i)})
-	// }
+	for i := range fs {
+		strats = append(strats, &namedStrategy{"cnst" + strconv.Itoa(i), cnst([]int{i})})
+	}
+	for i := 1; i <= 20; i++ {
+		strats = append(strats, &namedStrategy{"top" + strconv.Itoa(i), top(i)})
+		strats = append(strats, &namedStrategy{"topMin" + strconv.Itoa(i), topMin(i)})
+		strats = append(strats, &namedStrategy{"random" + strconv.Itoa(i), random(i)})
+		strats = append(strats, &namedStrategy{"bottom" + strconv.Itoa(i), bottom(i)})
+	}
 	for _, strat := range strats {
 		fmt.Printf("%v\t%v\n", strat.name, evaluate(strat.strat))
 	}
@@ -113,7 +113,6 @@ func profitability(cs []*chosen, start, end int) float64 {
 	total := 0.0
 	prof := 0.0
 	for _, c := range cs {
-		fmt.Println(c.value, table[c.i][start][end])
 		prof += c.value * table[c.i][start][end]
 		total += c.value
 	}
@@ -143,9 +142,6 @@ func evaluate(strat strategy) float64 {
 		if p == 0 {
 			continue
 		}
-		fmt.Println(annual(max(t, 0), t))
-		fmt.Println(annual(p, t))
-		fmt.Println(annual(max(t, 0), t) - annual(p, t))
 		num += (annual(max(t, 0), t) - annual(p, t)) * float64(t)
 		den += t
 	}
@@ -193,7 +189,6 @@ func (m minimumOnPastBest) choose(start, end int) []*chosen {
 		}
 		cs = append(cs, &chosen{i, fs[i].min})
 		money -= fs[i].min
-		fmt.Println(i, fs[i].min, maxValidTimeTable[i][start][end])
 	}
 	return cs
 }
