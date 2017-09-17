@@ -4,16 +4,16 @@ def main():
   funds = tf.placeholder(tf.float32)
   choice = tf.Variable([1.0, 1.0], dtype=tf.float32)
   optimum = tf.placeholder(tf.float32)
-  loss = tf.reduce_sum(optimum - tf.reduce_sum(tf.abs(choice) * funds / tf.reduce_sum(tf.abs(choice))))
-  train = tf.train.GradientDescentOptimizer(0.1).minimize(loss)
+  loss = tf.reduce_sum(optimum - choice * funds / tf.reduce_sum(choice))
+  train = tf.train.GradientDescentOptimizer(0.001).minimize(loss)
 
-  funds_train = [[1.1, 1,0], [1.2, 1.4]]
+  funds_train = [[1.1, 1.2]]
   optimum_train = [1.5]
 
   sess = tf.Session()
   sess.run(tf.global_variables_initializer())
   print(sess.run(loss, {funds: funds_train, optimum: optimum_train}))
-  for i in range(10000):
+  for i in range(100000):
     sess.run(train, {funds: funds_train, optimum: optimum_train})
 
   curr_choice, curr_loss = sess.run([choice, loss], {funds: funds_train, optimum: optimum_train})

@@ -45,33 +45,23 @@ func main() {
 	}
 	fillTable()
 	fillMaxValidTimeTable()
+	fmt.Println("go")
 	strats := []*namedStrategy{
-		{"all", all{}},
+		// {"all", all{}},
 		{"min115000", minimumOnPastBest(115000)},
-		{"126,104,154", cnst([]int{126, 104, 154})},
+		// {"126,104,154", cnst([]int{126, 104, 154})},
 	}
-	for i := range fs {
-		strats = append(strats, &namedStrategy{"cnst" + strconv.Itoa(i), cnst([]int{i})})
-	}
-	for i := 1; i <= 20; i++ {
-		strats = append(strats, &namedStrategy{"top" + strconv.Itoa(i), top(i)})
-		strats = append(strats, &namedStrategy{"topMin" + strconv.Itoa(i), topMin(i)})
-		strats = append(strats, &namedStrategy{"random" + strconv.Itoa(i), random(i)})
-		strats = append(strats, &namedStrategy{"bottom" + strconv.Itoa(i), bottom(i)})
-	}
+	// for i := range fs {
+	// 	strats = append(strats, &namedStrategy{"cnst" + strconv.Itoa(i), cnst([]int{i})})
+	// }
+	// for i := 1; i <= 20; i++ {
+	// 	strats = append(strats, &namedStrategy{"top" + strconv.Itoa(i), top(i)})
+	// 	strats = append(strats, &namedStrategy{"topMin" + strconv.Itoa(i), topMin(i)})
+	// 	strats = append(strats, &namedStrategy{"random" + strconv.Itoa(i), random(i)})
+	// 	strats = append(strats, &namedStrategy{"bottom" + strconv.Itoa(i), bottom(i)})
+	// }
 	for _, strat := range strats {
-		var num float64
-		var den int
-		for t := size - 1; t > 0; t-- {
-			cs := strat.strat.choose(size, t)
-			p := profitability(cs, t, 0)
-			if p == 0 {
-				continue
-			}
-			num += (annual(max(t, 0), t) - annual(p, t)) * float64(t)
-			den += t
-		}
-		fmt.Printf("%v\t%v\n", strat.name, num / float64(den))
+		fmt.Printf("%v\t%v\n", strat.name, evaluate(strat.strat))
 	}
 }
 
@@ -123,6 +113,7 @@ func profitability(cs []*chosen, start, end int) float64 {
 	total := 0.0
 	prof := 0.0
 	for _, c := range cs {
+		fmt.Println(c.value, table[c.i][start][end])
 		prof += c.value * table[c.i][start][end]
 		total += c.value
 	}
@@ -143,6 +134,24 @@ func max(start, end int) float64 {
 	return value
 }
 
+func evaluate(strat strategy) float64 {
+	var num float64
+	var den int
+	for t := 1; t < size; t++ {
+		cs := strat.choose(size, t)
+		p := profitability(cs, t, 0)
+		if p == 0 {
+			continue
+		}
+		fmt.Println(annual(max(t, 0), t))
+		fmt.Println(annual(p, t))
+		fmt.Println(annual(max(t, 0), t) - annual(p, t))
+		num += (annual(max(t, 0), t) - annual(p, t)) * float64(t)
+		den += t
+	}
+	return 100.0 * num / float64(den)
+}
+
 type minimumOnPastBest float64
 
 func fillMaxValidTimeTable() {
@@ -155,7 +164,7 @@ func fillMaxValidTimeTable() {
 		for end := 0; end < size; end++ {
 			for start := end + 1; start <= size; start++ {
 				if table[fi][start][end] != 0 {
-					maxValidTimeTable[fi][start][end] = math.Pow(table[fi][start][end], 1.0/(float64(len(fs[fi].rend))/12.0))
+					maxValidTimeTable[fi][start][end] = annual(table[fi][start][end], start - end)
 					continue
 				}
 				if start > end + 1 {
@@ -184,6 +193,7 @@ func (m minimumOnPastBest) choose(start, end int) []*chosen {
 		}
 		cs = append(cs, &chosen{i, fs[i].min})
 		money -= fs[i].min
+		fmt.Println(i, fs[i].min, maxValidTimeTable[i][start][end])
 	}
 	return cs
 }
