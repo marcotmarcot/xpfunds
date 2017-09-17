@@ -27,7 +27,12 @@ def main():
   for f in funds:
     f.createAnnual(optimum.duration)
   optimum.createAnnual(funds)
-  print(averageLoss(optimum, funds, PastBestStrategy(), money))
+  print(optimum.annual[optimum.duration][0])
+  print(optimum.annual[optimum.duration - 1][0])
+  print('python')
+  print('PastBest', averageLoss(optimum, funds, PastBestStrategy(), money))
+  # for i in range(len(funds)):
+  #   print(i, averageLoss(optimum, funds, SingleFundStrategy(i), money))
 
 
 class Fund:
@@ -75,10 +80,42 @@ class OptimumFund:
       for end in range(start):
         max = 0
         for f in funds:
+          if start > f.duration:
+            continue
           r = f.annual[start][end]
           if r > max:
             max = r
         self.annual[start][end] = max
+
+
+def averageLoss(optimum, funds, strategy, money):
+  num = 0
+  den = 0
+  for time in range(1, optimum.duration):
+    l = loss(optimum, funds, strategy, money, time)
+    if l is None:
+      continue
+    num += time * l
+    den += time
+  if den == 0:
+    return None
+  return num / den * 100.0
+
+
+def loss(optimum, funds, strategy, money, time):
+  fis = strategy.select(optimum.duration, funds, money, time)
+  num = 0
+  den = 0
+  for fi in fis:
+    if time > funds[fi].duration:
+      return None
+    print(funds[fi].min, funds[fi].table[time][0])
+    num += funds[fi].min * funds[fi].table[time][0]
+    den += funds[fi].min
+  print(optimum.annual[time][0])
+  print((num/den) ** (1.0/(time/12.0)))
+  print(optimum.annual[time][0] - (num/den) ** (1.0/(time/12.0)))
+  return optimum.annual[time][0] - (num/den) ** (1.0/(time/12.0))
 
 
 class PastBestStrategy:
@@ -91,26 +128,18 @@ class PastBestStrategy:
         break
       choice.append(fi)
       money -= funds[fi].min
+      print(fi, funds[fi].min, funds[fi].annual[max_time][time])
     return choice
 
 
-def averageLoss(optimum, funds, strategy, money):
-  num = 0
-  den = 0
-  for time in range(1, optimum.duration):
-    num += time * loss(optimum, funds, strategy, money, time)
-    den += time
-  return num / den
+class SingleFundStrategy:
+  def __init__(self, fund):
+    self.fund = fund
 
+  def select(self, max_time, funds, money, time):
+    return [self.fund]
 
-def loss(optimum, funds, strategy, money, time):
-  fis = strategy.select(optimum.duration, funds, money, time)
-  num = 0
-  den = 0
-  for fi in fis:
-    num += funds[fi].min * funds[fi].table[time][0]
-    den += funds[fi].min
-  return optimum.annual[time][0] - (num/den) ** (1.0/(time/12.0))
 
 if __name__ == '__main__':
-  cProfile.run('main()')
+  main()
+  # cProfile.run('main()')
