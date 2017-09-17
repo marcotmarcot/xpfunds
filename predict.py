@@ -13,7 +13,7 @@
 #
 # 3. Predict: Predict the rentability of the future based on the rentability of
 # the past.
-import cProfile
+# import cProfile
 # import tensorflow as tf
 
 money = 115000
@@ -28,8 +28,9 @@ def main():
     f.createAnnual(optimum.duration)
   optimum.createAnnual(funds)
   print('PastBest', averageLoss(optimum, funds, PastBestStrategy(), money, optimum.duration, 0))
+  print('SmallestLoss', averageLoss(optimum, funds, SmallestLossStrategy(), money, optimum.duration, 0))
   for i in range(len(funds)):
-    print(i, averageLoss(optimum, funds, SingleFundStrategy(i), money, optimum.duration, 0))
+    print('SingleFund(' + str(i) + '):' + str(funds[i].duration), averageLoss(optimum, funds, SingleFundStrategy(i), money, optimum.duration, 0))
 
 
 class Fund:
@@ -101,6 +102,8 @@ def averageLoss(optimum, funds, strategy, money, start, end):
 
 def loss(optimum, funds, strategy, money, start, end, time):
   fis = strategy.select(optimum, funds, money, start, time)
+  if len(fis) == 0:
+    return None
   num = 0
   den = 0
   for fi in fis:
@@ -117,6 +120,8 @@ class PastBestStrategy:
     fis = sorted(fis, key=lambda fi: -funds[fi].annual[start][end])
     choice = []
     for fi in fis:
+      if funds[fi].annual[start][end] == 0:
+        break
       if funds[fi].annual[start][end] == 0 or funds[fi].min > money:
         break
       choice.append(fi)
@@ -130,6 +135,28 @@ class SingleFundStrategy:
 
   def select(self, optimum, funds, money, start, end):
     return [self.fund]
+
+
+class SmallestLossStrategy:
+  def select(self, optimum, funds, money, start, end):
+    loss = []
+    for i in range(len(funds)):
+      l = averageLoss(optimum, funds, SingleFundStrategy(i), money, start, end)
+      if l is None:
+        l = 1000000
+      loss.append(l)
+    fis = list(range(len(funds)))
+    fis = sorted(fis, key=lambda fi: loss[fi])
+    choice = []
+    for fi in fis:
+      if funds[fi].annual[start][end] == 0:
+        break
+      if funds[fi].annual[start][end] == 0 or funds[fi].min > money:
+        break
+      choice.append(fi)
+      money -= funds[fi].min
+    return choice
+
 
 
 if __name__ == '__main__':
