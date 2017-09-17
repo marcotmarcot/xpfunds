@@ -53,9 +53,9 @@ class Fund:
   def createAnnual(self, max_time):
     self.annual = []
     for start in range(max_time + 1):
-      self.annual.append([])
+      self.annual.append([0] * start)
       for end in range(start):
-        self.annual[start].append(self.computeAnnual(start, end))
+        self.annual[start][end] = self.computeAnnual(start, end)
 
   def computeAnnual(self, start, end):
     if end >= self.duration:
