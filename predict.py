@@ -53,16 +53,12 @@ class Fund:
   def createAnnual(self, max_time):
     self.annual = []
     for start in range(max_time + 1):
-      self.annual.append([0] * start)
+      if start > self.duration:
+        self.annual.append(self.annual[self.duration])
+        continue
+      self.annual.append([0] * max_time)
       for end in range(start):
-        self.annual[start][end] = self.computeAnnual(start, end)
-
-  def computeAnnual(self, start, end):
-    if end >= self.duration:
-      return 0
-    if start > self.duration:
-      start = self.duration
-    return annual(self.table[start][end], start - end)
+        self.annual[start][end] = self.table[start][end] ** (1.0/((start - end)/12.0))
 
 
 class OptimumFund:
@@ -84,10 +80,6 @@ class OptimumFund:
           if r > max:
             max = r
         self.annual[start][end] = max
-
-
-def annual(value, months):
-  return value ** (1.0/(months/12.0))
 
 
 class PastBestStrategy:
@@ -119,7 +111,7 @@ def loss(optimum, funds, strategy, money, time):
   for fi in fis:
     num += funds[fi].min * funds[fi].table[time][0]
     den += funds[fi].min
-  return optimum.annual[time][0] - annual(num/den, time)
+  return optimum.annual[time][0] - (num/den) ** (1.0/(time/12.0))
 
 if __name__ == '__main__':
   cProfile.run('main()')
