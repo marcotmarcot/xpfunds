@@ -124,14 +124,14 @@ def main():
   manual_choice[126] = 1.0
   print(choice_loss(funds_train, duration_train, optima_train, manual_choice))
 
-  funds_list_train
-  one_hots_train
+  print(len(funds_list_train[0]))
+  print(len(funds_data))
   feature_columns = [tf.feature_column.numeric_column('funds', shape=[len(funds_data)])]
   estimator = tf.estimator.LinearRegressor(feature_columns=feature_columns, label_dimension=len(funds_data))
   input_fn = tf.estimator.inputs.numpy_input_fn(
-    {'funds': funds_list_train}, one_hots_train, batch_size=(max_time - 1), num_epochs=None, shuffle=True)
+    {'funds': np.array(funds_list_train)}, np.array(one_hots_train), batch_size=(max_time - 1), num_epochs=None, shuffle=True)
   train_input_fn = tf.estimator.inputs.numpy_input_fn(
-    {'funds': funds_list_train}, one_hots_train, batch_size=(max_time - 1), num_epochs=1000, shuffle=False)
+    {'funds': np.array(funds_list_train)}, np.array(one_hots_train), batch_size=(max_time - 1), num_epochs=1000, shuffle=False)
 
   estimator.train(input_fn=input_fn, steps=10)
 
@@ -139,8 +139,7 @@ def main():
 
   predict_input_fn = tf.estimator.inputs.numpy_input_fn({'funds': np.array([fund_train])}, num_epochs=1, shuffle=False)
   predictions = estimator.predict(input_fn=predict_input_fn)
-  for i in predictions:
-    print(i)
+  print(list(predictions)[0]['predictions'])
 
 
 if __name__ == '__main__':

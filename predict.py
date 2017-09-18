@@ -1,20 +1,6 @@
-# Possible strategies
-#
-# 1. Select: Train with the raw fund data as input and the selection of the best
-# fund as output, with an array where only the best fund is 1 and the others are
-# 0.
-#   * Disadvantages:
-#     * Ignores most of the data on the future.
-#
-# 2. Loss: Use the loss function to train, looking only at the future.
-#   * Disadvantages:
-#     * Ignores the data of the past.
-#     * Generates strategy that always chose the same funds
-#
-# 3. Predict: Predict the rentability of the future based on the rentability of
-# the past.
-# import cProfile
-# import tensorflow as tf
+import cProfile
+import tensorflow as tf
+import numpy as np
 
 money = 115000
 
@@ -27,10 +13,16 @@ def main():
   for f in funds:
     f.createAnnual(optimum.duration)
   optimum.createAnnual(funds)
-  print('PastBest', averageLoss(optimum, funds, PastBestStrategy(), money, optimum.duration, 0))
-  print('SmallestLoss', averageLoss(optimum, funds, SmallestLossStrategy(), money, optimum.duration, 0))
-  for i in range(len(funds)):
-    print('SingleFund(' + str(i) + '):' + str(funds[i].duration), averageLoss(optimum, funds, SingleFundStrategy(i), money, optimum.duration, 0))
+  # print('PredictStrategy', averageLoss(optimum, funds, PredictStrategy(), money, optimum.duration, 0))
+  # print('PastBest', averageLoss(optimum, funds, PastBestStrategy(), money, optimum.duration, 0))
+  # print('SmallestLoss', averageLoss(optimum, funds, SmallestLossStrategy(), money, optimum.duration, 0))
+  # for i in range(len(funds)):
+  #   print('SingleFund(' + str(i) + '):' + str(funds[i].duration), averageLoss(optimum, funds, SingleFundStrategy(i), money, optimum.duration, 0))
+  print('PredictStrategy', loss(optimum, funds, PredictStrategy(), money, optimum.duration, 0, optimum.duration // 2))
+  # print('PastBest', loss(optimum, funds, PastBestStrategy(), money, optimum.duration, 0, optimum.duration // 2))
+  # print('SmallestLoss', loss(optimum, funds, SmallestLossStrategy(), money, optimum.duration, 0, optimum.duration // 2))
+  # for i in range(len(funds)):
+  #   print('SingleFund(' + str(i) + '):' + str(funds[i].duration), loss(optimum, funds, SingleFundStrategy(i), money, optimum.duration, 0, optimum.duration // 2))
 
 
 class Fund:
@@ -157,7 +149,63 @@ class SmallestLossStrategy:
       money -= funds[fi].min
     return choice
 
+class PredictStrategy:
+  def select(self, optimum, funds, money, start, end):
+    if start - end <= 1:
+      return []
+    train_input = []
+    train_output = []
+    i = 0
+    for time in range(end + 1, start):
+      for f in funds:
+        if f.annual[time][end] == 0:
+          continue
+        train_output.append(f.annual[time][end])
+        input = [0] * (start - end - 1)
+        for month in range(time, start):
+          if month >= f.duration:
+            break
+          input[month - time] = f.raw[month]
+        train_input.append(input)
+        i += 1
 
+    train_input_fn = tf.estimator.inputs.numpy_input_fn(
+      {'funds': np.array(train_input)},
+      np.array(train_output),
+      batch_size=len(train_input),
+      num_epochs=None,
+      shuffle=True)
+    feature_columns = [tf.feature_column.numeric_column('funds', shape=[start - end - 1])]
+    estimator = tf.estimator.LinearRegressor(feature_columns=feature_columns) # DNNClassifier(feature_columns=feature_columns, hidden_units=[1024, 512, 256])
+    estimator.train(input_fn=train_input_fn, steps=100)
+
+    input = np.zeros((len(funds), start - end - 1))
+    for i in range(len(funds)):
+      for month in range(time, start):
+        if month >= funds[i].duration:
+          break
+        train_input[i][month - time] = funds[i].raw[month]
+    input_fn = tf.estimator.inputs.numpy_input_fn(
+      {'funds': input},
+      num_epochs=1,
+      shuffle=False)
+    predictions = estimator.predict(input_fn=input_fn)
+    pred = []
+    for p in predictions:
+      pred.append(p['predictions'][0])
+    print(pred)
+
+    fis = list(range(len(funds)))
+    fis = sorted(fis, key=lambda fi: -pred[fi])
+    choice = []
+    for fi in fis:
+      if funds[fi].annual[start][end] == 0:
+        break
+      if funds[fi].annual[start][end] == 0 or funds[fi].min > money:
+        break
+      choice.append(fi)
+      money -= funds[fi].min
+    return choice
 
 if __name__ == '__main__':
   main()
