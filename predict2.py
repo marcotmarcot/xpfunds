@@ -11,19 +11,22 @@ def main():
       funds.append(Fund(line))
   optimum = OptimumFund(funds)
   for f in funds:
-    print(f.duration)
     f.createAnnual(optimum.duration)
   optimum.createAnnual(funds)
-  # print('PredictStrategy', averageLoss(optimum, funds, PredictStrategy(), money, optimum.duration, 0))
-  # print('PastBest', averageLoss(optimum, funds, PastBestStrategy(), money, optimum.duration, 0))
-  # print('SmallestLoss', averageLoss(optimum, funds, SmallestLossStrategy(), money, optimum.duration, 0))
-  # for i in range(len(funds)):
-  #   print('SingleFund(' + str(i) + '):' + str(funds[i].duration), averageLoss(optimum, funds, SingleFundStrategy(i), money, optimum.duration, 0))
-  # print('PredictStrategy', loss(optimum, funds, PredictStrategy(), money, optimum.duration, 0, optimum.duration // 2))
-  # print('PastBest', loss(optimum, funds, PastBestStrategy(), money, optimum.duration, 0, optimum.duration // 2))
-  # print('SmallestLoss', loss(optimum, funds, SmallestLossStrategy(), money, optimum.duration, 0, optimum.duration // 2))
-  # for i in range(len(funds)):
-  #   print('SingleFund(' + str(i) + '):' + str(funds[i].duration), loss(optimum, funds, SingleFundStrategy(i), money, optimum.duration, 0, optimum.duration // 2))
+  strategies = [
+    PastBestStrategy(),
+    SmallestLossStrategy()]
+  for i in range(len(funds)):
+    strategies.append(ConstStrategy([i]))
+  for inlen in range(5):
+    for outlen in range(5):
+      strategies.append(PredictStrategy(inlen * 24 + 1, outlen * 24 + 1))
+  # strategies.append(PredictStrategy(74, 13))
+  results = []
+  for s in strategies:
+    v = averageLoss(optimum, funds, s, money, optimum.duration, 0)
+    # v = loss(optimum, funds, s, money, optimum.duration, 0, 3 * optimum.duration // 4)
+    print(s.name, v)
 
 
 class Fund:
@@ -90,7 +93,7 @@ def averageLoss(optimum, funds, strategy, money, start, end):
     den += time
   if den == 0:
     return None
-  return num / den * 100.0
+  return num / den
 
 
 def loss(optimum, funds, strategy, money, start, end, time):
@@ -102,111 +105,113 @@ def loss(optimum, funds, strategy, money, start, end, time):
   for fi in fis:
     if time > funds[fi].duration:
       return None
-    num += funds[fi].min * funds[fi].table[time][end]
-    den += funds[fi].min
-  return optimum.annual[time][0] - (num/den) ** (1.0/(time/12.0))
+    num += funds[fi].table[time][end]
+  return optimum.annual[time][0] - (num/len(fis)) ** (1.0/(time/12.0))
 
 
 class PastBestStrategy:
-  def select(self, optimum, funds, money, start, end):
-    fis = list(range(len(funds)))
-    fis = sorted(fis, key=lambda fi: -funds[fi].annual[start][end])
-    choice = []
-    for fi in fis:
-      if funds[fi].annual[start][end] == 0:
-        break
-      if funds[fi].annual[start][end] == 0 or funds[fi].min > money:
-        break
-      choice.append(fi)
-      money -= funds[fi].min
-    return choice
-
-
-class SingleFundStrategy:
-  def __init__(self, fund):
-    self.fund = fund
+  def __init__(self):
+    self.name = 'Best'
 
   def select(self, optimum, funds, money, start, end):
-    return [self.fund]
+    return sortAndPick(funds, money, start, end, lambda fi: -funds[fi].annual[start][end])
+
+
+class ConstStrategy:
+  def __init__(self, funds):
+    self.funds = funds
+    self.name = 'Const' + str(funds).replace(' ', '')
+
+  def select(self, optimum, funds, money, start, end):
+    return self.funds
 
 
 class SmallestLossStrategy:
+  def __init__(self):
+    self.name = 'Loss'
+
   def select(self, optimum, funds, money, start, end):
     loss = []
     for i in range(len(funds)):
-      l = averageLoss(optimum, funds, SingleFundStrategy(i), money, start, end)
+      l = averageLoss(optimum, funds, ConstStrategy([i]), money, start, end)
       if l is None:
         l = 1000000
       loss.append(l)
-    fis = list(range(len(funds)))
-    fis = sorted(fis, key=lambda fi: loss[fi])
-    choice = []
-    for fi in fis:
-      if funds[fi].annual[start][end] == 0:
-        break
-      if funds[fi].annual[start][end] == 0 or funds[fi].min > money:
-        break
-      choice.append(fi)
-      money -= funds[fi].min
-    return choice
+    return sortAndPick(funds, money, start, end, lambda fi: loss[fi])
+
 
 class PredictStrategy:
+  def __init__(self, inlen, outlen):
+    self.inlen = inlen
+    self.outlen = outlen
+    self.name = 'Predict(' + str(inlen) + ',' + str(outlen) + ')'
+
   def select(self, optimum, funds, money, start, end):
-    if start - end <= 1:
+    if start - end < self.inlen + self.outlen:
       return []
     train_input = []
     train_output = []
-    i = 0
-    for time in range(end + 1, start):
+    for time in range(end + self.outlen, start - self.inlen):
       for f in funds:
-        if f.annual[time][end] == 0:
+        if time + self.inlen > f.duration:
           continue
-        train_output.append(f.annual[time][end])
-        input = [0] * (start - end - 1)
-        for month in range(time, start):
-          if month >= f.duration:
-            break
-          input[month - time] = f.raw[month]
+        train_output.append(f.annual[time][time - self.outlen])
+        input = []
+        for month in range(time, time + self.inlen):
+          input.append(f.raw[month])
         train_input.append(input)
-        i += 1
 
+    if len(train_input) == 0:
+      return []
     train_input_fn = tf.estimator.inputs.numpy_input_fn(
       {'funds': np.array(train_input)},
       np.array(train_output),
       batch_size=len(train_input),
       num_epochs=None,
       shuffle=True)
-    feature_columns = [tf.feature_column.numeric_column('funds', shape=[start - end - 1])]
-    estimator = tf.estimator.DNNClassifier(feature_columns=feature_columns, hidden_units=[10])
-    estimator.train(input_fn=train_input_fn, steps=100)
+    feature_columns = [tf.feature_column.numeric_column('funds', shape=[self.inlen])]
+    estimator = tf.estimator.LinearRegressor(feature_columns=feature_columns)
+    estimator.train(input_fn=train_input_fn, steps=1000)
 
-    input = np.zeros((len(funds), start - end - 1))
+    pred_input = []
+    input_fi = []
     for i in range(len(funds)):
-      for month in range(time, start):
-        if month >= funds[i].duration:
-          break
-        train_input[i][month - time] = funds[i].raw[month]
+      if end + self.inlen > funds[i].duration:
+        continue
+      input = []
+      for month in range(end, end + self.inlen):
+        input.append(funds[i].raw[month])
+      pred_input.append(input)
+      input_fi.append(i)
     input_fn = tf.estimator.inputs.numpy_input_fn(
-      {'funds': input},
+      {'funds': np.array(pred_input)},
       num_epochs=1,
       shuffle=False)
     predictions = estimator.predict(input_fn=input_fn)
-    pred = []
+    pred = [0] * len(funds)
+    i = 0
     for p in predictions:
-      pred.append(p['predictions'][0])
-    print(pred)
+      pred[input_fi[i]] = p['predictions'][0]
+      i += 1
 
-    fis = list(range(len(funds)))
-    fis = sorted(fis, key=lambda fi: -pred[fi])
-    choice = []
-    for fi in fis:
-      if funds[fi].annual[start][end] == 0:
-        break
-      if funds[fi].annual[start][end] == 0 or funds[fi].min > money:
-        break
-      choice.append(fi)
-      money -= funds[fi].min
+    choice = sortAndPick(funds, money, start, end, lambda fi: -pred[fi])
     return choice
+
+
+def sortAndPick(funds, money, start, end, sortFn):
+  fis = sorted(list(range(len(funds))), key=sortFn)
+  choice = []
+  max = 0
+  for fi in fis:
+    if funds[fi].annual[start][end] == 0:
+      break
+    if funds[fi].min > max:
+      max = funds[fi].min
+    if (len(choice) + 1) * max > money:
+      break
+    choice.append(fi)
+  return choice
+
 
 if __name__ == '__main__':
   main()
