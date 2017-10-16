@@ -34,6 +34,7 @@ func get(url string) string {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
+	fmt.Println(string(b))
 	return string(b)
 }
 
