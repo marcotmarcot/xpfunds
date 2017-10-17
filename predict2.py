@@ -1,8 +1,8 @@
-import cProfile
-import numpy as np
+# import cProfile
+# import numpy as np
 import random
 import sys
-import tensorflow as tf
+# import tensorflow as tf
 
 money = 115000
 
@@ -16,15 +16,16 @@ def main():
     f.createAnnual(optimum.duration)
   optimum.createAnnual(funds)
   strategies = [
-    BestStrategy(),
-    WorstStrategy(),
-    SmallestLossStrategy(),
     RandomStrategy()]
-  for i in range(len(funds)):
-    strategies.append(ConstStrategy([i]))
-  for inlen in range(1, 5):
-    for outlen in range(1, 5):
-      strategies.append(PredictStrategy(inlen, outlen))
+  for i in range(36):
+    strategies.append(BestStrategy(i))
+    strategies.append(WorstStrategy(i))
+    # strategies.append(SmallestLossStrategy(i))
+  # for i in range(len(funds)):
+  #   strategies.append(ConstStrategy([i]))
+  # for inlen in range(1, 5):
+  #   for outlen in range(1, 5):
+  #     strategies.append(PredictStrategy(inlen, outlen))
   for s in strategies:
     v = averageLoss(optimum, funds, s, money, optimum.duration, 0)
     print(s.name, v)
@@ -112,16 +113,18 @@ def loss(optimum, funds, strategy, money, start, end, time):
 
 
 class BestStrategy:
-  def __init__(self):
-    self.name = 'Best'
+  def __init__(self, minimum):
+    self.name = 'Best(' + str(minimum) + ')'
+    self.minimum = minimum
 
   def select(self, optimum, funds, money, start, end):
-    return sortAndPick(funds, money, start, end, lambda fi: -funds[fi].annual[start][end])
+    return sortAndPick(funds, money, start, end, lambda fi: -funds[fi].annual[start][end], self.minimum)
 
 
 class WorstStrategy:
-  def __init__(self):
-    self.name = 'Worst'
+  def __init__(self, minimum):
+    self.name = 'Worst(' + str(minimum) + ')'
+    self.minimum = minimum
 
   def select(self, optimum, funds, money, start, end):
     annual = []
@@ -130,7 +133,7 @@ class WorstStrategy:
         annual.append(10000)
       else:
         annual.append(funds[fi].annual[start][end])
-    return sortAndPick(funds, money, start, end, lambda fi: annual[fi])
+    return sortAndPick(funds, money, start, end, lambda fi: annual[fi], self.minimum)
 
 
 class ConstStrategy:
@@ -143,8 +146,9 @@ class ConstStrategy:
 
 
 class SmallestLossStrategy:
-  def __init__(self):
-    self.name = 'Loss'
+  def __init__(self, minimum):
+    self.name = 'Loss(' + str(minimum) + ')'
+    self.minimum = minimum
 
   def select(self, optimum, funds, money, start, end):
     loss = []
@@ -153,7 +157,7 @@ class SmallestLossStrategy:
       if l is None:
         l = 1000000
       loss.append(l)
-    return sortAndPick(funds, money, start, end, lambda fi: loss[fi])
+    return sortAndPick(funds, money, start, end, lambda fi: loss[fi], self.minimum)
 
 
 class RandomStrategy:
@@ -235,12 +239,12 @@ class PredictStrategy:
     return choice
 
 
-def sortAndPick(funds, money, start, end, sortFn):
+def sortAndPick(funds, money, start, end, sortFn, minimum=2):
   fis = sorted(list(range(len(funds))), key=sortFn)
   choice = []
   max = 0
   for fi in fis:
-    if funds[fi].annual[start][end] == 0:
+    if end + minimum > funds[fi].duration:
       break
     if funds[fi].min > max:
       max = funds[fi].min
