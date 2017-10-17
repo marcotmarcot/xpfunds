@@ -45,10 +45,10 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			v = v / 100.0 + 1.0
+			v = v / 100.0
 			values = append(values, v)
 			sum += v
-			if v < 1 {
+			if v < 0 {
 				neg++
 			}
 		}
@@ -57,15 +57,15 @@ func main() {
 		total := 0.0
 		gd := 1.0
 		gds := 0
-		for i := range values {
-			prod *= values[i]
+		for i := len(values) - 1; i >= 0; i-- {
+			prod *= 1.0 + values[i]
 			total += math.Pow(values[i]-mean, 2)
 			sprod := 1.0
-			for j := i; j < len(values); j++ {
-				sprod *= values[j]
-				if prod < gd {
+			for j := i; j >= 0; j-- {
+				sprod *= 1.0 + values[j]
+				if sprod < gd {
 					gd = sprod
-					gds = j - i + 1
+					gds = i - j + 1
 				}
 			}
 		}
