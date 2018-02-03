@@ -142,8 +142,8 @@ func evaluate(strat strategy) float64 {
 		if p == 0 {
 			continue
 		}
-		num += (annual(max(t, 0), t) - annual(p, t)) * float64(t)
-		den += t
+		num += (annual(max(t, 0), t) - annual(p, t))
+		den += 1
 	}
 	return 100.0 * num / float64(den)
 }
