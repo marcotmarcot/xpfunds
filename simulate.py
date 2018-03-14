@@ -12,7 +12,7 @@ def main():
   optimum.createAnnual(funds)
   strategies = [RandomStrategy(), BestStrategy(), WorstStrategy()]
   for s in strategies:
-    for num_funds in range(1, 8):
+    for num_funds in range(1, 20):
       for min_time in range(12):
         l, d = averageLossAndDiff(optimum, funds, s, num_funds, min_time, optimum.duration, 0)
         print(s.name, '\t',  num_funds, '\t', min_time, '\t', l, '\t', d)
@@ -78,30 +78,44 @@ class OptimumFund:
 def averageLossAndDiff(optimum, funds, strategy, num_funds, min_time, start, end):
   ln = 0
   ld = 0
-  den = 0
+  dn = 0
+  dd = 0
   for time in range(end + 1, start):
+    duration = time - end
     l, d = lossAndDiff(optimum, funds, strategy, num_funds, min_time, start, end, time)
-    if l is None:
-      continue
-    ln += l
-    ld += d
-    den += 1
-  if den == 0:
-    return None, None
-  return ln / den, ld / den
+    if l is not None:
+      ln += l * duration
+      ld += duration
+    if d is not None:
+      dn += d * duration
+      dd += duration
+  if ld == 0:
+    l = None
+  else:
+    l = ln / ld
+  if dd == 0:
+    d = None
+  else:
+    d = dn / dd
+  return l, d
 
 
 def lossAndDiff(optimum, funds, strategy, num_funds, min_time, start, end, time):
   fis = strategy.select(optimum, funds, num_funds, min_time, start, time)
   if len(fis) == 0:
     return None, None
-  num = 0
+  numl = 0
   for fi in fis:
     if time > funds[fi].duration:
       return None, None
-    num += funds[fi].table[time][end]
-  l = optimum.annual[time][0] - (num/len(fis)) ** (1.0/(time/12.0))
-  d = optimum.annual[start][time] - (num/len(fis)) ** (1.0/(time/12.0))
+    numl += funds[fi].annual[time][end]
+  l = optimum.annual[time][end] - numl/len(fis)
+  numd = 0
+  for fi in fis:
+    if time + 1 > funds[fi].duration:
+      return l, None
+    numd += funds[fi].annual[start][time]
+  d = numd/len(fis) - numl/len(fis)
   return l, d
 
 
@@ -158,4 +172,3 @@ def sortAndPick(funds, num_funds, min_time, start, end, sortFn):
 
 if __name__ == '__main__':
   main()
-  # cProfile.run('main()')
