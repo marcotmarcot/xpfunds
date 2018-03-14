@@ -1,3 +1,7 @@
+# Remove .table, only .annual is necessary
+# Remove bidimensional arrays, only from_start and to_end is necessary, both of them annualized
+# Create strategy that selects fund with smaller average proportion from optimum in the past. This will require creating a new field in Fund to store the average proportion from_start.
+
 import random
 import sys
 
@@ -109,13 +113,13 @@ def lossAndDiff(optimum, funds, strategy, num_funds, min_time, start, end, time)
     if time > funds[fi].duration:
       return None, None
     numl += funds[fi].annual[time][end]
-  l = optimum.annual[time][end] - numl/len(fis)
+  l = numl/len(fis)/optimum.annual[time][end]
   numd = 0
   for fi in fis:
     if time + 1 > funds[fi].duration:
       return l, None
     numd += funds[fi].annual[start][time]
-  d = numd/len(fis) - numl/len(fis)
+  d = numl/numd
   return l, d
 
 
