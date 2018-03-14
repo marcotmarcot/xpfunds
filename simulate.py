@@ -1,9 +1,11 @@
-# Remove .table, only .annual is necessary
-# Remove bidimensional arrays, only from_start and to_end is necessary, both of them annualized
 # Create strategy that selects fund with smaller average proportion from optimum in the past. This will require creating a new field in Fund to store the average proportion from_start.
+# Remove .table, only .annual is necessary
+# Rewrite in Go to improve performance
 
 import random
 import sys
+
+ignore = 6
 
 def main():
   funds = []
@@ -17,7 +19,7 @@ def main():
   strategies = [RandomStrategy(), BestStrategy(), WorstStrategy()]
   for s in strategies:
     for num_funds in range(1, 20):
-      for min_time in range(12):
+      for min_time in range(24):
         l, d = averageLossAndDiff(optimum, funds, s, num_funds, min_time, optimum.duration, 0)
         print(s.name, '\t',  num_funds, '\t', min_time, '\t', l, '\t', d)
         sys.stdout.flush()
@@ -25,6 +27,7 @@ def main():
     s = ConstStrategy([i])
     l, d = averageLossAndDiff(optimum, funds, s, 0, 0, optimum.duration, 0)
     print(s.name, '\t0\t0\t', l, '\t', d)
+
 
 class Fund:
   def __init__(self, line):
@@ -84,15 +87,15 @@ def averageLossAndDiff(optimum, funds, strategy, num_funds, min_time, start, end
   ld = 0
   dn = 0
   dd = 0
-  for time in range(end + 1, start):
-    duration = time - end
+  for time in range(end + 1 + ignore, start - ignore):
+    weight = 1
     l, d = lossAndDiff(optimum, funds, strategy, num_funds, min_time, start, end, time)
     if l is not None:
-      ln += l * duration
-      ld += duration
+      ln += l * weight
+      ld += weight
     if d is not None:
-      dn += d * duration
-      dd += duration
+      dn += d * weight
+      dd += weight
   if ld == 0:
     l = None
   else:
@@ -113,13 +116,13 @@ def lossAndDiff(optimum, funds, strategy, num_funds, min_time, start, end, time)
     if time > funds[fi].duration:
       return None, None
     numl += funds[fi].annual[time][end]
-  l = numl/len(fis)/optimum.annual[time][end]
+  l = numl/len(fis) / optimum.annual[time][end]
   numd = 0
   for fi in fis:
     if time + 1 > funds[fi].duration:
       return l, None
     numd += funds[fi].annual[start][time]
-  d = numl/numd
+  d = numl / numd
   return l, d
 
 
