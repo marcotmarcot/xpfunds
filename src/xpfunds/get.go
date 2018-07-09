@@ -47,14 +47,19 @@ func get(url string) *goquery.Document {
 
 func processFund(url string) {
 	doc := get("https://portal.xpi.com.br" + url)
-	if doc.Find("input[value=\"Quero aplicar agora\"]").Length() != 1 || doc.FindMatcher(suffixMatcher{"ualificados"}).Length() == 1 {
-		return
+	active := "true"
+	if doc.Find("input[value=\"Quero aplicar agora\"]").Length() != 1 || doc.FindMatcher(containsMatcher{"ualificados"}).Length() == 1 {
+		active = "false"
 	}
 	name := doc.Find("h2.fleft").Text()
-	min := doc.FindMatcher(suffixMatcher{"Aplicação Inicial Mínima"}).Next().Text()[3:]
-	cot := strings.Split(strings.Split(doc.FindMatcher(suffixMatcher{"Resgate - Cotização"}).Next().Text(), "(")[0], " ")[0][2:]
+	minText := doc.FindMatcher(containsMatcher{"Aplicação Inicial Mínima"}).Next().Text()
+	if len(minText) < 4 {
+		log.Fatal(url)
+	}
+	min := minText[3:]
+	cot := strings.Split(strings.Split(doc.FindMatcher(containsMatcher{"Resgate - Cotização"}).Next().Text(), "(")[0], " ")[0][2:]
 	prefixLen := 2
-	liq := doc.FindMatcher(suffixMatcher{"Resgate - Liquidação Financeira"}).Next().Text()
+	liq := doc.FindMatcher(containsMatcher{"Resgate - Liquidação Financeira"}).Next().Text()
 	if strings.HasPrefix(liq, "D+ ") {
 		prefixLen = 3
 	}
@@ -71,7 +76,7 @@ func processFund(url string) {
 		})
 		allProfs = append(allProfs, yearProfs...)
 	})
-	fmt.Println(strings.Join(append([]string{name, min, cot, liq}, allProfs...), "\t"))
+	fmt.Println(strings.Join(append([]string{name, min, cot, liq, active}, allProfs...), "\t"))
 }
 
 type fundYearMatcher struct {
@@ -97,19 +102,19 @@ func (m fundYearMatcher) Filter(ns []*html.Node) []*html.Node {
 	return filter(m, ns)
 }
 
-type suffixMatcher struct {
+type containsMatcher struct {
 	suffix string
 }
 
-func (m suffixMatcher) Match(n *html.Node) bool {
-	return n.FirstChild != nil && strings.HasSuffix(n.FirstChild.Data, m.suffix)
+func (m containsMatcher) Match(n *html.Node) bool {
+	return n.FirstChild != nil && strings.Contains(n.FirstChild.Data, m.suffix)
 }
 
-func (m suffixMatcher) MatchAll(n *html.Node) []*html.Node {
+func (m containsMatcher) MatchAll(n *html.Node) []*html.Node {
 	return matchAll(m, n)
 }
 
-func (m suffixMatcher) Filter(ns []*html.Node) []*html.Node {
+func (m containsMatcher) Filter(ns []*html.Node) []*html.Node {
 	return filter(m, ns)
 }
 

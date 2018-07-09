@@ -31,9 +31,9 @@ func Main() {
 	// for i := range funds {
 	// 	strategies = append(strategies, single{i})
 	// }
-	for num_funds := 8; num_funds <= 8; num_funds++ {
-		for min_time := 2; min_time <= 2; min_time++ {
-			for num_months := -1; num_months <= 20; num_months += 1 {
+	for num_funds := 1; num_funds <= 8; num_funds++ {
+		for min_time := 0; min_time <= 2; min_time++ {
+			for num_months := -1; num_months <= 2; num_months += 1 {
 				strategies = append(strategies, best{num_funds, min_time, num_months}, worst{num_funds, min_time, num_months}, random{num_funds, min_time, num_months})
 			}
 		}
@@ -50,7 +50,7 @@ var funds []*fund
 func newFund(fields []string) *fund {
 	f := &fund{}
 	var raw []float64
-	for i := 4; i < len(fields); i++ {
+	for i := 5; i < len(fields); i++ {
 		v, err := strconv.ParseFloat(strings.Replace(fields[i], ",", ".", 1), 64)
 		if err != nil {
 			log.Fatal(err)
