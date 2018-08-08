@@ -27,20 +27,20 @@ func Main() {
 		funds = append(funds, newFund(fields))
 	}
 	newOptimum()
-	strategies := []strategy{best{}, worst{}, random{}}
-	// for i := range funds {
-	// 	strategies = append(strategies, single{i})
-	// }
-	for num_funds := 1; num_funds <= 8; num_funds++ {
-		for min_time := 0; min_time <= 2; min_time++ {
-			for num_months := -1; num_months <= 2; num_months += 1 {
-				strategies = append(strategies, best{num_funds, min_time, num_months}, worst{num_funds, min_time, num_months}, random{num_funds, min_time, num_months})
+	var strategies []strategy
+	for num_funds := 1; num_funds <= 24; num_funds++ {
+		for min_time := 0; min_time <= 12; min_time += 1 {
+			for num_months := 0; num_months <= 4; num_months += 1 {
+				strategies = append(strategies, best{num_funds, min_time, num_months}, random{num_funds, min_time, num_months})
 			}
 		}
 	}
 	for _, s := range strategies {
-		l, d, f, mf := meanPerformance(s, len(optimum.rentabilities), 0)
-		fmt.Println(s.name(), l, d, f, mf)
+		// l: Mean (future return / best possible return in future)
+		// f: Mean future return
+		// m: Minimal future return
+		l, f, m := meanPerformance(s, len(optimum.rentabilities), 0)
+		fmt.Println(s.name(), l, f, m)
 	}
 }
 
@@ -116,10 +116,11 @@ func newOptimum() {
 	}
 }
 
-func meanPerformance(s strategy, start, end int) (loss float64, diff float64, meanFuture float64, minFuture float64) {
+func meanPerformance(s strategy, start, end int) (loss, future, min float64) {
 	var losses []float64
 	var diffs []float64
 	var futures []float64
+	m := 999999.0
 	for time := 0; time < len(optimum.rentabilities) - 1; time++ {
 		l, d, f := performance(s, start, end, time)
 		if l != nil {
@@ -130,25 +131,27 @@ func meanPerformance(s strategy, start, end int) (loss float64, diff float64, me
 		}
 		if f != nil {
 			futures = append(futures, *f)
+			if *f < m {
+				m = *f
+			}
 		}
 	}
-	mf := 0.0
-	if len(futures) > 0 {
-		mf = futures[0]
-	}
-	return mean(losses), mean(diffs), mean(futures), mf
+	return mean(losses), mean(futures), m
 }
 
 func mean(s []float64) float64 {
 	if len(s) == 0 {
 		return -1
 	}
+	if len(s) == 1 {
+		return s[0]
+	}
 	sort.Float64s(s)
 	m := len(s) / 2
 	if len(s)%2 == 0 {
 		return s[m]
 	}
-	return (s[m] + s[m]) / 2
+	return (s[m] + s[m + 1]) / 2
 }
 
 func performance(s strategy, start, end, time int) (loss *float64, diff *float64, future *float64) {
@@ -279,8 +282,8 @@ func (b byAverage) Swap(i, j int) {
 }
 
 func (b byAverage) Less(i, j int) bool {
-	if b.num_months != -1 {
-		b.start = b.end + b.num_months
+	if b.num_months > 0 {
+		b.start = b.end + b.num_months - 1
 	}
 	ri := funds[b.fis[i]].average(b.start, b.end)
 	rj := funds[b.fis[j]].average(b.start, b.end)

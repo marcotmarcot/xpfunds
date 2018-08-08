@@ -14,9 +14,11 @@ import (
 	"strings"
 )
 
+var num_months = 2
+
 func main() {
 	r := bufio.NewReader(os.Stdin)
-	fmt.Printf("Nome\tMínimo\tDias para resgate\tIdade em meses\tDesvio padrão\tMeses negativos\tMaior queda\tPeríodo da maior queda em meses\tRentabilidade anualizada\tInvestível\n")
+	fmt.Printf("Nome\tMínimo\tDias para resgate\tIdade em meses\tDesvio padrão\tMeses negativos\tMaior queda\tPeríodo da maior queda em meses\tRentabilidade anualizada\tRentabilidade dos últimos meses\tInvestível\n")
 	for true {
 		line, err := r.ReadString('\n')
 		if err != nil {
@@ -70,7 +72,15 @@ func main() {
 				}
 			}
 		}
-		fmt.Printf("\t%d\t%s\t%s%%\t%s%%\t%d\t%s%%\t%s\n", len(values), formatFloat(100.0*math.Sqrt(total/float64(len(values)))), formatFloat(100.0*float64(neg)/float64(len(values))), formatFloat((gd-1.0)*100.0), gds, formatFloat((math.Pow(prod, 1.0/(float64(len(values))/12.0))-1.0)*100.0), active)
+		num_months_fund := num_months
+		if len(values) < num_months_fund {
+			num_months_fund = len(values)
+		}
+		num_months_prod := 1.0
+		for i := num_months_fund -1; i >= 0; i-- {
+			num_months_prod *= 1.0 + values[i]
+		}
+		fmt.Printf("\t%d\t%s\t%s%%\t%s%%\t%d\t%s%%\t%s%%\t%s\n", len(values), formatFloat(100.0*math.Sqrt(total/float64(len(values)))), formatFloat(100.0*float64(neg)/float64(len(values))), formatFloat((gd-1.0)*100.0), gds, formatFloat((math.Pow(prod, 1.0/(float64(len(values))/12.0))-1.0)*100.0), formatFloat((math.Pow(num_months_prod, 1.0/(float64(num_months_fund)/12.0))-1.0)*100.0), active)
 	}
 }
 
