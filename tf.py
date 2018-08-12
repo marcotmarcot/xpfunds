@@ -7,17 +7,13 @@ import time
 EPOCHS = 500
 
 def main():
-  train_data_list = []
-  train_labels_list = []
-  for i in range(100):
-    train_data_list.append([i])
-    train_labels_list.append(i + i)
-  print(train_data_list)
-  print(train_labels_list)
-  train_data = np.array(train_data_list)
-  train_labels = np.array(train_labels_list)
-  test_data = np.array([[4], [5], [6]])
-  test_labels = np.array([8, 10, 12])
+  train_data = np.loadtxt('train_data.tsv', ndmin=2)
+  train_labels = np.loadtxt('train_labels.tsv')
+  test_data = np.loadtxt('test_data.tsv', ndmin=2)
+  test_labels = np.loadtxt('test_labels.tsv')
+  print(train_data)
+  print(train_labels)
+  print(test_labels)
 
   # Normalize
   mean = train_data.mean(axis=0)
@@ -48,16 +44,60 @@ def main():
       callbacks=[PrintDot()])
 
   [loss, mae] = model.evaluate(test_data, test_labels, verbose=0)
-  print("Testing set Mean Abs Error: {}".format(mae * 1000))
-
+  print("Testing set Mean Abs Error: {}".format(mae))
   test_predictions = model.predict(test_data).flatten()
   print(test_predictions)
+  np.savetxt('test_predictions.tsv', test_predictions, delimiter='\t')
+
+
+class Fund:
+  def __init__(self, line):
+    fields = line.strip().split('\t')
+    monthly = []
+    for f in fields[5:]:
+      monthly.append(1 + float(f.replace(',', '.')) / 100)
+    self.duration = len(self.raw)
+    # The monthly profit of the fund. Starts from the last month we have data
+    # and goes back to the first month we have data.
+    self.monthly = np.array(monthly)
+    self.duration = len(self.monthly)
+
+  def annual(self, end, start):
+    return self.monthly[end:start].prod() ** (1.0/((start - end)/12.0))
+
+
+def data_and_labels(funds, end, start):
+  data = []
+  labels = []
+  for f in funds:
+    for time in range(end + 1, start - 1):
+      if time >= f.duration:
+        break
+      duration = f.duration - time
+      negative_months = 0
+      largest_drop = 999.0
+      for monthly in f.monthly[time:f.duration]:
+        if monthly < 1.0:
+          negative_months += 1
+        drop = monthly
+        for s in range(e + 1, f.duration):
+          drop *= f.raw[s]
+          if drop < largest_drop:
+            largest_drop = drop
+      data.append([
+          f.annual(time, f.duration),
+          duration,
+          negative_months / duration,
+          np.array(values).std(axis=0),
+          largest_drop
+      ])
+      labels.append(f.annual(end, time))
+  return np.array(data), np.array(labels)
 
 
 class PrintDot(keras.callbacks.Callback):
   def on_epoch_end(self, epoch, logs):
-    if epoch % 100 == 0: print('')
-    print('.', end='')
+    if epoch % 100 == 0: print(epoch)
 
 
 def plot_history(history):
@@ -72,6 +112,7 @@ def plot_history(history):
   plt.legend()
   plt.ylim([0, 5])
   plt.show()
+
 
 if __name__ == '__main__':
   main()
