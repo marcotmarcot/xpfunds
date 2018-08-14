@@ -14,21 +14,30 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	// "github.com/montanaflynn/stats"
 	"os"
 	"xpfunds"
 )
 
+var testMonths = flag.Int("test_months", 1,
+	"How many months to use for test. The rest of the months will be used for"+
+		" trainning. The last months are reserved for testing.")
+
 func main() {
+	flag.Parse()
 	funds := xpfunds.ReadFunds()
 	duration := xpfunds.MaxDuration(funds)
-	writeFiles(funds, duration/2, duration, "train")
-	writeFiles(funds, 0, duration/2+1, "test")
+	cdis := xpfunds.ReadLines("cdi.tsv")
+	ipcas := xpfunds.ReadLines("ipca.tsv")
+	writeFiles(funds, cdis, ipcas, *testMonths, duration, "train")
+	writeFiles(funds, cdis, ipcas, 0, *testMonths, "test")
 }
 
 // Goes through all time periods between end and start (both exclusive) and
 // product the data and labels for this period.
-func writeFiles(funds []*xpfunds.Fund, end, start int, name string) {
+func writeFiles(funds []*xpfunds.Fund, cdis, ipcas []float64, end, start int, name string) {
 	data, err := os.Create(name + "_data.tsv")
 	xpfunds.Check(err)
 	labels, err := os.Create(name + "_labels.tsv")
@@ -41,12 +50,44 @@ func writeFiles(funds []*xpfunds.Fund, end, start int, name string) {
 				break
 			}
 			// The annualized return from the beginning of the fund until now.
-			fmt.Fprintf(data, "%v", f.Annual(time, f.Duration()))
+			fmt.Fprintf(data, "\t%v", f.Annual(time, f.Duration()))
+
+			// Standard deviation.
+			// std, err := stats.StandardDeviation(f.Monthly[time:f.Duration()])
+			// xpfunds.Check(err)
+			// fmt.Fprintf(data, "\t%v", std)
+
+			// The CDI from the month.
+			// fmt.Fprintf(data, "\t%v", cdis[time])
+
+			// The IPCA from the month.
+			// fmt.Fprintf(data, "\t%v", ipcas[time])
+
+			// The return from the last month
+			// fmt.Fprintf(data, "\t%v", f.Period[time][0])
+
+			// An indicator of which fund this data came from.
+			// for _, f2 := range funds {
+			// 	if f.Name == f2.Name {
+			// 		fmt.Fprintf(data, "\t1")
+			// 	} else {
+			// 		fmt.Fprintf(data, "\t0")
+			// 	}
+			// }
+
 			// The number of months from the beginning of the fund until now.
 			// fmt.Fprintf(data, "\t%v", f.Duration() - time)
+
 			fmt.Fprintf(data, "\n")
 			fmt.Fprintf(labels, "%v\n", f.Annual(end, time))
 			fmt.Fprintf(metadata, "%v\t%v\n", f.Name, time)
 		}
 	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

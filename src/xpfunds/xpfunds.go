@@ -30,6 +30,15 @@ func ReadFunds() []*Fund {
 type Fund struct {
 	Name string
 
+	// The minimum value that can be invested in this fund.
+	Min int
+
+	// The number of days that we need to wait to invest on this fund.
+	Days int
+
+	// The monthly return of the fund, starting from the last month.
+	Monthly []float64
+
 	// The return in a period, from end (inclusive) to number of months after
 	// end (inclusive). That is, to get the period of months 4 months starting
 	// at 1 and ending at 4 is in period[1][3].
@@ -38,29 +47,34 @@ type Fund struct {
 
 func newFund(line string) *Fund {
 	fields := strings.Split(strings.Trim(line, "\n"), "\t")
-	if fields == nil {
+	if len(fields) < 6 {
 		return nil
 	}
 
 	f := &Fund{}
 	f.Name = fields[0]
 
-	// The monthly return of the fund, starting from the last month.
-	var monthly []float64
+	var err error
+	f.Min, err = strconv.Atoi(strings.Replace(strings.Replace(fields[1], ",00", "", 1), ".", "", -1))
+	Check(err)
+
+	liq, err := strconv.Atoi(fields[2])
+	Check(err)
+	cot, err := strconv.Atoi(fields[3])
+	Check(err)
+	f.Days = liq + cot
+
 	for i := 5; i < len(fields); i++ {
 		v, err := strconv.ParseFloat(strings.Replace(fields[i], ",", ".", 1), 64)
 		Check(err)
-		monthly = append(monthly, 1.0+v/100.0)
+		f.Monthly = append(f.Monthly, 1.0+v/100.0)
 	}
-	if len(monthly) == 0 {
-		return nil
-	}
-	f.Period = make([][]float64, len(monthly))
-	for end, Monthly := range monthly {
-		f.Period[end] = make([]float64, len(monthly)-end)
-		f.Period[end][0] = Monthly
-		for diff := 1; diff < len(monthly)-end; diff++ {
-			f.Period[end][diff] = f.Period[end][diff-1] * monthly[end+diff]
+	f.Period = make([][]float64, len(f.Monthly))
+	for end, monthly := range f.Monthly {
+		f.Period[end] = make([]float64, len(f.Monthly)-end)
+		f.Period[end][0] = monthly
+		for diff := 1; diff < len(f.Monthly)-end; diff++ {
+			f.Period[end][diff] = f.Period[end][diff-1] * f.Monthly[end+diff]
 		}
 	}
 	return f
@@ -93,4 +107,18 @@ func MaxDuration(funds []*Fund) int {
 		}
 	}
 	return duration
+}
+
+func ReadLines(file string) []float64 {
+	text, err := ioutil.ReadFile(file)
+	Check(err)
+	var values []float64
+	for _, line := range strings.Split(string(text), "\n") {
+		value, err := strconv.ParseFloat(strings.Replace(strings.Trim(line, "\n"), ",", ".", 1), 64)
+		if err != nil {
+			break
+		}
+		values = append(values, 1.0+value/100.0)
+	}
+	return values
 }

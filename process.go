@@ -77,7 +77,7 @@ func main() {
 			num_months_fund = len(values)
 		}
 		num_months_prod := 1.0
-		for i := num_months_fund -1; i >= 0; i-- {
+		for i := num_months_fund - 1; i >= 0; i-- {
 			num_months_prod *= 1.0 + values[i]
 		}
 		fmt.Printf("\t%d\t%s\t%s%%\t%s%%\t%d\t%s%%\t%s%%\t%s\n", len(values), formatFloat(100.0*math.Sqrt(total/float64(len(values)))), formatFloat(100.0*float64(neg)/float64(len(values))), formatFloat((gd-1.0)*100.0), gds, formatFloat((math.Pow(prod, 1.0/(float64(len(values))/12.0))-1.0)*100.0), formatFloat((math.Pow(num_months_prod, 1.0/(float64(num_months_fund)/12.0))-1.0)*100.0), active)
@@ -90,7 +90,7 @@ func formatFloat(f float64) string {
 
 type fund struct {
 	name string
-	min float64
+	min  float64
 	days int64
-	raw []float64
+	raw  []float64
 }

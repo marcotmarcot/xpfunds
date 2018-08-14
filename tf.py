@@ -11,9 +11,10 @@ def main():
   train_labels = np.loadtxt('train_labels.tsv')
   test_data = np.loadtxt('test_data.tsv', ndmin=2)
   test_labels = np.loadtxt('test_labels.tsv')
-  print(train_data)
-  print(train_labels)
-  print(test_labels)
+
+  # Remove lines with zero
+  # train_data = train_data[:, np.all(train_data != 0, axis=0)]
+  # test_data = test_data[:, np.all(test_data != 0, axis=0)]
 
   # Normalize
   mean = train_data.mean(axis=0)
@@ -40,13 +41,11 @@ def main():
       train_labels,
       epochs=EPOCHS,
       validation_split=0.2,
-      verbose=0,
-      callbacks=[PrintDot()])
+      verbose=0)
 
   [loss, mae] = model.evaluate(test_data, test_labels, verbose=0)
   print("Testing set Mean Abs Error: {}".format(mae))
   test_predictions = model.predict(test_data).flatten()
-  print(test_predictions)
   np.savetxt('test_predictions.tsv', test_predictions, delimiter='\t')
 
 
@@ -93,11 +92,6 @@ def data_and_labels(funds, end, start):
       ])
       labels.append(f.annual(end, time))
   return np.array(data), np.array(labels)
-
-
-class PrintDot(keras.callbacks.Callback):
-  def on_epoch_end(self, epoch, logs):
-    if epoch % 100 == 0: print(epoch)
 
 
 def plot_history(history):

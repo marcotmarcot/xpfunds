@@ -1,6 +1,7 @@
 package simulate
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -10,34 +11,37 @@ import (
 	"xpfunds"
 )
 
+var start_time = flag.Int("start_time", -1,
+	"The beginning of the evaluation period in months from the last month.")
+
+var end_time = flag.Int("end_time", -1,
+	"The end of the evaluation period in months from the last month.")
+
 func Main() {
+	flag.Parse()
 	funds := xpfunds.ReadFunds()
 	optimum := newOptimum(funds)
 	strategies := []strategy{
-		&random{},
-		&fromStart{0, false},
-		&fromStart{0, true},
-		newMl()}
+		&random{12},
+		&minAndDays{57},
+		// newMl(12),
+	}
 
 	// How many months to check data for. 0 for all history.
-	for numMonths := 96; numMonths <= 98; numMonths += 1 {
-		strategies = append(strategies, &fromStart{numMonths, false}, &fromStart{numMonths, true})
+	for numMonths := 34; numMonths <= 36; numMonths += 1 {
+		strategies = append(strategies, &fromStart{12, numMonths, false}, &fromStart{12, numMonths, true})
 	}
 
 	for _, s := range strategies {
 
-		// How many funds to pick.
-		for numFunds := 1; numFunds <= 12; numFunds += 11 {
+		// Discard funds that don't have at least that many months.
+		for minTime := 1; minTime <= 12; minTime += 1 {
 
-				// Discard funds that don't have at least that many months.
-				for minTime := 1; minTime <= 1; minTime += 1 {
-
-				// future: Mean future return
-				// loss: Mean (future return / best possible return in future)
-				// min: Minimal future return
-				future, loss, min := meanPerformance(funds, optimum, s, minTime, numFunds)
-				fmt.Println(s.name(), numFunds, minTime, future, loss, min)
-			}
+			// future: Mean future return
+			// loss: Mean (future return / best possible return in future)
+			// min: Minimal future return
+			future, loss, min := meanPerformance(funds, optimum, s, minTime)
+			fmt.Println(s.name(), minTime, future, loss, min)
 		}
 	}
 }
@@ -50,7 +54,7 @@ func newOptimum(funds []*xpfunds.Fund) *xpfunds.Fund {
 		optimum.Period[end] = make([]float64, duration-end)
 		for diff := 0; diff < duration-end; diff++ {
 			for _, fund := range funds {
-				if end + diff >= fund.Duration() {
+				if end+diff >= fund.Duration() {
 					continue
 				}
 				if fund.Period[end][diff] > optimum.Period[end][diff] {
@@ -59,19 +63,26 @@ func newOptimum(funds []*xpfunds.Fund) *xpfunds.Fund {
 			}
 		}
 	}
-	fmt.Println(optimum.Annual(0, optimum.Duration() / 2))
 	return optimum
 }
 
-func meanPerformance(funds []*xpfunds.Fund, optimum *xpfunds.Fund, s strategy, minTime, numFunds int) (future, loss, min float64) {
+func meanPerformance(funds []*xpfunds.Fund, optimum *xpfunds.Fund, s strategy, minTime int) (future, loss, min float64) {
 	var futures []float64
 	var losses []float64
 
-	// We start at 1 and end before the last element because we need to have at
-	// least one month in the beginning to get the data and one month in the end
-	// to check the performance. We divide the duration by 2 because the first
-	// part was used for trainning.
-	for time := 1; time < optimum.Duration() / 2 - 1; time++ {
+	start := *start_time
+	if start == -1 {
+		// We start at 1 and end before the last element because we need to have
+		// at least one month in the beginning to get the data and one month in
+		// the end to check the performance. We divide the duration by 2 because
+		// the first part was used for trainning.
+		start = optimum.Duration() - 1
+	}
+	end := *end_time
+	if end == -1 {
+		end = 1
+	}
+	for time := end; time <= start; time++ {
 
 		// Create a list with all indexes to funds.
 		var allIndexes []int
@@ -90,7 +101,7 @@ func meanPerformance(funds []*xpfunds.Fund, optimum *xpfunds.Fund, s strategy, m
 			continue
 		}
 
-		future := performance(funds, optimum, filtered, s, numFunds, time)
+		future := performance(funds, optimum, filtered, s, time)
 		futures = append(futures, future)
 		losses = append(losses, future/optimum.Annual(0, time))
 	}
@@ -125,11 +136,8 @@ func minimum(s []float64) float64 {
 	return min
 }
 
-func performance(funds []*xpfunds.Fund, optimum *xpfunds.Fund, indexes []int, s strategy, numFunds, time int) float64 {
+func performance(funds []*xpfunds.Fund, optimum *xpfunds.Fund, indexes []int, s strategy, time int) float64 {
 	indexes = s.choose(funds, indexes, time)
-	if len(indexes) > numFunds {
-		indexes = indexes[:numFunds]
-	}
 	total_future := 0.0
 	for _, i := range indexes {
 		total_future += funds[i].Return(0, time)
@@ -145,10 +153,12 @@ type strategy interface {
 	choose(funds []*xpfunds.Fund, indexes []int, end int) []int
 }
 
-type random struct{}
+type random struct {
+	numFunds int
+}
 
 func (r *random) name() string {
-	return "Random"
+	return "Random" + strconv.Itoa(r.numFunds)
 }
 
 func (r *random) choose(funds []*xpfunds.Fund, indexes []int, end int) []int {
@@ -157,10 +167,14 @@ func (r *random) choose(funds []*xpfunds.Fund, indexes []int, end int) []int {
 	for i, index := range rand.Perm(len(indexes)) {
 		chosen[i] = indexes[index]
 	}
+	if len(chosen) > r.numFunds {
+		chosen = chosen[:r.numFunds]
+	}
 	return chosen
 }
 
 type fromStart struct {
+	numFunds  int
 	numMonths int
 	reverse   bool
 }
@@ -172,11 +186,14 @@ func (f *fromStart) name() string {
 	} else {
 		name = "Best"
 	}
-	return name + strconv.Itoa(f.numMonths)
+	return name + strconv.Itoa(f.numFunds) + "," + strconv.Itoa(f.numMonths)
 }
 
 func (f *fromStart) choose(funds []*xpfunds.Fund, indexes []int, end int) []int {
 	sort.Sort(byReturnFromStart{indexes, funds, end, f.numMonths, f.reverse})
+	if len(indexes) > f.numFunds {
+		indexes = indexes[:f.numFunds]
+	}
 	return indexes
 }
 
@@ -214,17 +231,18 @@ func returnFromStart(f *xpfunds.Fund, end, numMonths int) float64 {
 }
 
 type ml struct {
+	numFunds  int
 	predicted map[fundTime]float64
 }
 
-func newMl() *ml {
+func newMl(numFunds int) *ml {
 	metadata_text, err := ioutil.ReadFile("test_metadata.tsv")
 	xpfunds.Check(err)
 	predictions_text, err := ioutil.ReadFile("test_predictions.tsv")
 	xpfunds.Check(err)
 	metadata_lines := strings.Split(string(metadata_text), "\n")
 	predictions_lines := strings.Split(string(predictions_text), "\n")
-	ml := &ml{make(map[fundTime]float64)}
+	ml := &ml{numFunds, make(map[fundTime]float64)}
 	for i := range metadata_lines {
 		fields := strings.Split(strings.Trim(metadata_lines[i], "\n"), "\t")
 		if len(fields) < 2 {
@@ -245,11 +263,14 @@ type fundTime struct {
 }
 
 func (m *ml) name() string {
-	return "Ml"
+	return "Ml" + strconv.Itoa(m.numFunds)
 }
 
 func (m *ml) choose(funds []*xpfunds.Fund, indexes []int, end int) []int {
 	sort.Sort(byMl{indexes, funds, end, m.predicted})
+	if len(indexes) > m.numFunds {
+		indexes = indexes[:m.numFunds]
+	}
 	return indexes
 }
 
@@ -272,4 +293,44 @@ func (b byMl) Less(i, j int) bool {
 	ri := b.predicted[fundTime{b.funds[b.indexes[i]].Name, b.end}]
 	rj := b.predicted[fundTime{b.funds[b.indexes[j]].Name, b.end}]
 	return ri > rj
+}
+
+type minAndDays struct {
+	numFunds int
+}
+
+func (m *minAndDays) name() string {
+	return "MinAndDays" + strconv.Itoa(m.numFunds)
+}
+
+func (m *minAndDays) choose(funds []*xpfunds.Fund, indexes []int, end int) []int {
+	sort.Sort(byMinAndDays{indexes, funds})
+	if len(indexes) > m.numFunds {
+		indexes = indexes[:m.numFunds]
+	}
+	return indexes
+}
+
+type byMinAndDays struct {
+	indexes []int
+	funds   []*xpfunds.Fund
+}
+
+func (b byMinAndDays) Len() int {
+	return len(b.indexes)
+}
+
+func (b byMinAndDays) Swap(i, j int) {
+	b.indexes[i], b.indexes[j] = b.indexes[j], b.indexes[i]
+}
+
+func (b byMinAndDays) Less(i, j int) bool {
+	mi := b.funds[b.indexes[i]].Min
+	mj := b.funds[b.indexes[j]].Min
+	if mi == mj {
+		di := b.funds[b.indexes[i]].Days
+		dj := b.funds[b.indexes[j]].Days
+		return di < dj
+	}
+	return mi < mj
 }
