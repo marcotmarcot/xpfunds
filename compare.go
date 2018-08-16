@@ -1,14 +1,24 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"xpfunds"
 )
 
+var months = flag.Int("months", -1,
+	"How many months back in time to read. -1 for reading all time")
+
 func main() {
+	flag.Parse()
 	cdis := xpfunds.ReadLines("cdi.tsv")
 	funds := xpfunds.ReadFunds()
-	duration := xpfunds.MaxDuration(funds)
+	var duration int
+	if *months == -1 {
+		duration = xpfunds.MaxDuration(funds)
+	} else {
+		duration = *months
+	}
 
 	ratio_total := 0.0
 	for time := 0; time < duration; time++ {

@@ -122,3 +122,23 @@ func ReadLines(file string) []float64 {
 	}
 	return values
 }
+
+func NewOptimum(funds []*Fund) *Fund {
+	optimum := &Fund{}
+	duration := MaxDuration(funds)
+	optimum.Period = make([][]float64, duration)
+	for end := range optimum.Period {
+		optimum.Period[end] = make([]float64, duration-end)
+		for diff := 0; diff < duration-end; diff++ {
+			for _, fund := range funds {
+				if end+diff >= fund.Duration() {
+					continue
+				}
+				if fund.Period[end][diff] > optimum.Period[end][diff] {
+					optimum.Period[end][diff] = fund.Period[end][diff]
+				}
+			}
+		}
+	}
+	return optimum
+}

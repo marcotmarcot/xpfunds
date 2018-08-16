@@ -20,7 +20,7 @@ var end_time = flag.Int("end_time", -1,
 func Main() {
 	flag.Parse()
 	funds := xpfunds.ReadFunds()
-	optimum := newOptimum(funds)
+	optimum := xpfunds.NewOptimum(funds)
 	strategies := []strategy{
 		&random{12},
 		&minAndDays{57},
@@ -35,7 +35,7 @@ func Main() {
 	for _, s := range strategies {
 
 		// Discard funds that don't have at least that many months.
-		for minTime := 1; minTime <= 12; minTime += 1 {
+		for minTime := 1; minTime <= 3; minTime += 1 {
 
 			// future: Mean future return
 			// loss: Mean (future return / best possible return in future)
@@ -44,26 +44,6 @@ func Main() {
 			fmt.Println(s.name(), minTime, future, loss, min)
 		}
 	}
-}
-
-func newOptimum(funds []*xpfunds.Fund) *xpfunds.Fund {
-	optimum := &xpfunds.Fund{}
-	duration := xpfunds.MaxDuration(funds)
-	optimum.Period = make([][]float64, duration)
-	for end := range optimum.Period {
-		optimum.Period[end] = make([]float64, duration-end)
-		for diff := 0; diff < duration-end; diff++ {
-			for _, fund := range funds {
-				if end+diff >= fund.Duration() {
-					continue
-				}
-				if fund.Period[end][diff] > optimum.Period[end][diff] {
-					optimum.Period[end][diff] = fund.Period[end][diff]
-				}
-			}
-		}
-	}
-	return optimum
 }
 
 func meanPerformance(funds []*xpfunds.Fund, optimum *xpfunds.Fund, s strategy, minTime int) (future, loss, min float64) {
