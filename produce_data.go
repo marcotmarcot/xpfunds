@@ -29,15 +29,15 @@ func main() {
 	flag.Parse()
 	funds := xpfunds.ReadFunds()
 	duration := xpfunds.MaxDuration(funds)
-	cdis := xpfunds.ReadLines("cdi.tsv")
-	ipcas := xpfunds.ReadLines("ipca.tsv")
-	writeFiles(funds, cdis, ipcas, *testMonths, duration, "train")
-	writeFiles(funds, cdis, ipcas, 0, *testMonths, "test")
+	cdi := xpfunds.FundFromFile("cdi.tsv")
+	ipca := xpfunds.FundFromFile("ipca.tsv")
+	writeFiles(funds, cdi, ipca, *testMonths, duration, "train")
+	writeFiles(funds, cdi, ipca, 0, *testMonths, "test")
 }
 
 // Goes through all time periods between end and start (both exclusive) and
 // product the data and labels for this period.
-func writeFiles(funds []*xpfunds.Fund, cdis, ipcas []float64, end, start int, name string) {
+func writeFiles(funds []*xpfunds.Fund, cdi, ipca *Fund, end, start int, name string) {
 	data, err := os.Create(name + "_data.tsv")
 	xpfunds.Check(err)
 	labels, err := os.Create(name + "_labels.tsv")
@@ -58,10 +58,10 @@ func writeFiles(funds []*xpfunds.Fund, cdis, ipcas []float64, end, start int, na
 			// fmt.Fprintf(data, "\t%v", std)
 
 			// The CDI from the month.
-			// fmt.Fprintf(data, "\t%v", cdis[time])
+			// fmt.Fprintf(data, "\t%v", cdi.Monthly[time])
 
 			// The IPCA from the month.
-			// fmt.Fprintf(data, "\t%v", ipcas[time])
+			// fmt.Fprintf(data, "\t%v", ipca.Monthly[time])
 
 			// The return from the last month
 			// fmt.Fprintf(data, "\t%v", f.Period[time][0])

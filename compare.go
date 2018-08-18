@@ -11,7 +11,7 @@ var months = flag.Int("months", -1,
 
 func main() {
 	flag.Parse()
-	cdis := xpfunds.ReadLines("cdi.tsv")
+	cdi := xpfunds.FundFromFile("cdi.tsv")
 	funds := xpfunds.ReadFunds()
 	var duration int
 	if *months == -1 {
@@ -31,7 +31,7 @@ func main() {
 			monthly_total += f.Monthly[time]
 			monthly_count++
 		}
-		ratio_total += monthly_total / float64(monthly_count) / cdis[time]
+		ratio_total += monthly_total / float64(monthly_count) / cdi.Monthly[time]
 	}
 	fmt.Println(ratio_total / float64(duration))
 }

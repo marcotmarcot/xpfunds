@@ -21,34 +21,40 @@ func Main() {
 	flag.Parse()
 	funds := xpfunds.ReadFunds()
 	optimum := xpfunds.NewOptimum(funds)
-	strategies := []strategy{
-		&random{12},
-		&minAndDays{57},
-		// newMl(12),
-	}
+	cdi := xpfunds.FundFromFile("cdi.tsv")
+	var strategies []strategy
+	for _, numFunds := range []int{1, 2, 3} {
+		strategies = append(strategies,
+			&random{numFunds},
+			&minAndDays{numFunds},
+			// newMl(numFunds),
+		)
 
-	// How many months to check data for. 0 for all history.
-	for numMonths := 34; numMonths <= 36; numMonths += 1 {
-		strategies = append(strategies, &fromStart{12, numMonths, false}, &fromStart{12, numMonths, true})
+		// How many months to check data for. 0 for all history.
+		for numMonths := 0; numMonths <= 12; numMonths += 1 {
+			strategies = append(strategies, &fromStart{numFunds, numMonths, false}, &fromStart{numFunds, numMonths, true})
+		}
 	}
 
 	for _, s := range strategies {
 
 		// Discard funds that don't have at least that many months.
-		for minTime := 1; minTime <= 3; minTime += 1 {
+		for minTime := 1; minTime <= 3; minTime += 4 {
 
 			// future: Mean future return
 			// loss: Mean (future return / best possible return in future)
+			// cdi_ratio: Mean (future return / cdi)
 			// min: Minimal future return
-			future, loss, min := meanPerformance(funds, optimum, s, minTime)
-			fmt.Println(s.name(), minTime, future, loss, min)
+			future, loss, cdi_ratio, min := meanPerformance(funds, cdi, optimum, s, minTime)
+			fmt.Println(s.name(), minTime, future, loss, cdi_ratio, min)
 		}
 	}
 }
 
-func meanPerformance(funds []*xpfunds.Fund, optimum *xpfunds.Fund, s strategy, minTime int) (future, loss, min float64) {
+func meanPerformance(funds []*xpfunds.Fund, cdi, optimum *xpfunds.Fund, s strategy, minTime int) (future, loss, cdi_ratio, min float64) {
 	var futures []float64
 	var losses []float64
+	var cdi_ratios []float64
 
 	start := *start_time
 	if start == -1 {
@@ -84,8 +90,9 @@ func meanPerformance(funds []*xpfunds.Fund, optimum *xpfunds.Fund, s strategy, m
 		future := performance(funds, optimum, filtered, s, time)
 		futures = append(futures, future)
 		losses = append(losses, future/optimum.Annual(0, time))
+		cdi_ratios = append(cdi_ratios, future/cdi.Annual(0, time))
 	}
-	return mean(futures), mean(losses), minimum(futures)
+	return mean(futures), mean(losses), mean(cdi_ratios), minimum(futures)
 }
 
 func mean(s []float64) float64 {

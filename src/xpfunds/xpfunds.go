@@ -18,7 +18,7 @@ func ReadFunds() []*Fund {
 	Check(err)
 	var funds []*Fund
 	for _, line := range strings.Split(string(text), "\n") {
-		f := newFund(line)
+		f := fundFromLine(line)
 		if f == nil {
 			continue
 		}
@@ -45,7 +45,7 @@ type Fund struct {
 	Period [][]float64
 }
 
-func newFund(line string) *Fund {
+func fundFromLine(line string) *Fund {
 	fields := strings.Split(strings.Trim(line, "\n"), "\t")
 	if len(fields) < 6 {
 		return nil
@@ -69,14 +69,22 @@ func newFund(line string) *Fund {
 		Check(err)
 		f.Monthly = append(f.Monthly, 1.0+v/100.0)
 	}
-	f.Period = make([][]float64, len(f.Monthly))
-	for end, monthly := range f.Monthly {
-		f.Period[end] = make([]float64, len(f.Monthly)-end)
-		f.Period[end][0] = monthly
-		for diff := 1; diff < len(f.Monthly)-end; diff++ {
-			f.Period[end][diff] = f.Period[end][diff-1] * f.Monthly[end+diff]
+	f.setPeriod()
+	return f
+}
+
+func FundFromFile(file string) *Fund {
+	text, err := ioutil.ReadFile(file)
+	Check(err)
+	f := &Fund{}
+	for _, line := range strings.Split(string(text), "\n") {
+		value, err := strconv.ParseFloat(strings.Replace(strings.Trim(line, "\n"), ",", ".", 1), 64)
+		if err != nil {
+			break
 		}
+		f.Monthly = append(f.Monthly, 1.0+value/100.0)
 	}
+	f.setPeriod()
 	return f
 }
 
@@ -90,13 +98,24 @@ func (f *Fund) Annual(end, start int) float64 {
 	return Annual(f.Return(end, start), end, start)
 }
 
+func (f *Fund) Duration() int {
+	return len(f.Period)
+}
+
+func (f *Fund) setPeriod() {
+	f.Period = make([][]float64, len(f.Monthly))
+	for end, monthly := range f.Monthly {
+		f.Period[end] = make([]float64, len(f.Monthly)-end)
+		f.Period[end][0] = monthly
+		for diff := 1; diff < len(f.Monthly)-end; diff++ {
+			f.Period[end][diff] = f.Period[end][diff-1] * f.Monthly[end+diff]
+		}
+	}
+}
+
 func Annual(value float64, end, start int) float64 {
 	// We subtract 1 because start is exclusive.
 	return math.Pow(value, 12.0/float64(start-end))
-}
-
-func (f *Fund) Duration() int {
-	return len(f.Period)
 }
 
 func MaxDuration(funds []*Fund) int {
@@ -107,20 +126,6 @@ func MaxDuration(funds []*Fund) int {
 		}
 	}
 	return duration
-}
-
-func ReadLines(file string) []float64 {
-	text, err := ioutil.ReadFile(file)
-	Check(err)
-	var values []float64
-	for _, line := range strings.Split(string(text), "\n") {
-		value, err := strconv.ParseFloat(strings.Replace(strings.Trim(line, "\n"), ",", ".", 1), 64)
-		if err != nil {
-			break
-		}
-		values = append(values, 1.0+value/100.0)
-	}
-	return values
 }
 
 func NewOptimum(funds []*Fund) *Fund {
