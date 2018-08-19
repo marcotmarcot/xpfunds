@@ -23,7 +23,7 @@ func Main() {
 	optimum := xpfunds.NewOptimum(funds)
 	cdi := xpfunds.FundFromFile("cdi.tsv")
 	var strategies []strategy
-	for _, numFunds := range []int{1, 2, 3} {
+	for numFunds := 0; numFunds <= 12; numFunds++ {
 		strategies = append(strategies,
 			&random{numFunds},
 			&minAndDays{numFunds},
@@ -31,15 +31,19 @@ func Main() {
 		)
 
 		// How many months to check data for. 0 for all history.
-		for numMonths := 0; numMonths <= 12; numMonths += 1 {
-			strategies = append(strategies, &fromStart{numFunds, numMonths, false}, &fromStart{numFunds, numMonths, true})
+		for numMonths := 0; numMonths <= 120; numMonths += 12 {
+			strategies = append(strategies,
+				&fromStart{numFunds, numMonths, false},
+				&fromStart{numFunds, numMonths, true},
+				&meanSubPeriods{numFunds, numMonths, false},
+				&meanSubPeriods{numFunds, numMonths, true})
 		}
 	}
 
 	for _, s := range strategies {
 
 		// Discard funds that don't have at least that many months.
-		for minTime := 1; minTime <= 3; minTime += 4 {
+		for minTime := 1; minTime <= 121; minTime += 12 {
 
 			// future: Mean future return
 			// loss: Mean (future return / best possible return in future)
@@ -92,22 +96,7 @@ func meanPerformance(funds []*xpfunds.Fund, cdi, optimum *xpfunds.Fund, s strate
 		losses = append(losses, future/optimum.Annual(0, time))
 		cdi_ratios = append(cdi_ratios, future/cdi.Annual(0, time))
 	}
-	return mean(futures), mean(losses), mean(cdi_ratios), minimum(futures)
-}
-
-func mean(s []float64) float64 {
-	if len(s) == 0 {
-		return -1
-	}
-	if len(s) == 1 {
-		return s[0]
-	}
-	sort.Float64s(s)
-	m := len(s) / 2
-	if len(s)%2 == 0 {
-		return s[m]
-	}
-	return (s[m] + s[m+1]) / 2
+	return xpfunds.Mean(futures), xpfunds.Mean(losses), xpfunds.Mean(cdi_ratios), minimum(futures)
 }
 
 func minimum(s []float64) float64 {
@@ -129,7 +118,7 @@ func performance(funds []*xpfunds.Fund, optimum *xpfunds.Fund, indexes []int, s 
 	for _, i := range indexes {
 		total_future += funds[i].Return(0, time)
 	}
-	return xpfunds.Annual(total_future/float64(len(indexes)), 0, time)
+	return xpfunds.Annual(total_future / float64(len(indexes)), 0, time)
 }
 
 type strategy interface {
@@ -320,4 +309,61 @@ func (b byMinAndDays) Less(i, j int) bool {
 		return di < dj
 	}
 	return mi < mj
+}
+
+type meanSubPeriods struct {
+	numFunds  int
+	numMonths int
+	reverse   bool
+}
+
+func (m *meanSubPeriods) name() string {
+	var name string
+	if m.reverse {
+		name = "WorstMSP"
+	} else {
+		name = "BestMSP"
+	}
+	return name + strconv.Itoa(m.numFunds) + "," + strconv.Itoa(m.numMonths)
+}
+
+func (m *meanSubPeriods) choose(funds []*xpfunds.Fund, indexes []int, end int) []int {
+	sort.Sort(byMeanSubPeriods{indexes, funds, end, m.numMonths, m.reverse})
+	if len(indexes) > m.numFunds {
+		indexes = indexes[:m.numFunds]
+	}
+	return indexes
+}
+
+type byMeanSubPeriods struct {
+	indexes   []int
+	funds     []*xpfunds.Fund
+	end       int
+	numMonths int
+	reverse   bool
+}
+
+func (b byMeanSubPeriods) Len() int {
+	return len(b.indexes)
+}
+
+func (b byMeanSubPeriods) Swap(i, j int) {
+	b.indexes[i], b.indexes[j] = b.indexes[j], b.indexes[i]
+}
+
+func (b byMeanSubPeriods) Less(i, j int) bool {
+	ri := meanSubPeriodsReturn(b.funds[b.indexes[i]], b.end, b.numMonths)
+	rj := meanSubPeriodsReturn(b.funds[b.indexes[j]], b.end, b.numMonths)
+	if b.reverse {
+		return rj > ri
+	}
+	return ri > rj
+}
+
+func meanSubPeriodsReturn(f *xpfunds.Fund, end, numMonths int) float64 {
+	start := f.Duration()
+	if numMonths != 0 && end+numMonths < f.Duration() {
+		start = end + numMonths
+	}
+	return f.MeanSubPeriodsReturn(end, start)
 }

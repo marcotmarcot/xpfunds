@@ -64,7 +64,7 @@ func writeFiles(funds []*xpfunds.Fund, cdi, ipca *Fund, end, start int, name str
 			// fmt.Fprintf(data, "\t%v", ipca.Monthly[time])
 
 			// The return from the last month
-			// fmt.Fprintf(data, "\t%v", f.Period[time][0])
+			// fmt.Fprintf(data, "\t%v", f.Annual(time, time+1))
 
 			// An indicator of which fund this data came from.
 			// for _, f2 := range funds {

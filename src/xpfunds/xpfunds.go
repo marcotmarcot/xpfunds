@@ -3,6 +3,9 @@ package xpfunds
 import (
 	"io/ioutil"
 	"math"
+	"os"
+	"path"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -39,10 +42,14 @@ type Fund struct {
 	// The monthly return of the fund, starting from the last month.
 	Monthly []float64
 
-	// The return in a period, from end (inclusive) to number of months after
-	// end (inclusive). That is, to get the period of months 4 months starting
-	// at 1 and ending at 4 is in period[1][3].
+	// The annualized return in a period, from end (inclusive) to number of
+	// months after end (inclusive). That is, to get the period of months 4
+	// months starting at 1 and ending at 4 is in period[1][3].
 	Period [][]float64
+
+	// The mean annualized return in all subperiods inside this period. Same
+	// rule as Period.
+	MeanSubPeriods [][]float64
 }
 
 func fundFromLine(line string) *Fund {
@@ -98,6 +105,10 @@ func (f *Fund) Annual(end, start int) float64 {
 	return Annual(f.Return(end, start), end, start)
 }
 
+func (f *Fund) MeanSubPeriodsReturn(end, start int) float64 {
+	return f.MeanSubPeriods[end][start-1-end]
+}
+
 func (f *Fund) Duration() int {
 	return len(f.Period)
 }
@@ -109,6 +120,22 @@ func (f *Fund) setPeriod() {
 		f.Period[end][0] = monthly
 		for diff := 1; diff < len(f.Monthly)-end; diff++ {
 			f.Period[end][diff] = f.Period[end][diff-1] * f.Monthly[end+diff]
+		}
+	}
+	file := path.Join("subperiods", f.Name+".tsv")
+	text, err := ioutil.ReadFile(file)
+	if os.IsNotExist(err) {
+		return
+	}
+	Check(err)
+	lines := strings.Split(string(text), "\n")
+	f.MeanSubPeriods = make([][]float64, len(f.Monthly))
+	for end := range f.MeanSubPeriods {
+		f.MeanSubPeriods[end] = make([]float64, len(f.Monthly)-end)
+		fields := strings.Split(lines[end], "\t")
+		for diff := range f.MeanSubPeriods[end] {
+			f.MeanSubPeriods[end][diff], err = strconv.ParseFloat(strings.Replace(fields[diff], ",", ".", 1), 64)
+			Check(err)
 		}
 	}
 }
@@ -146,4 +173,19 @@ func NewOptimum(funds []*Fund) *Fund {
 		}
 	}
 	return optimum
+}
+
+func Mean(s []float64) float64 {
+	if len(s) == 0 {
+		return -1
+	}
+	if len(s) == 1 {
+		return s[0]
+	}
+	sort.Float64s(s)
+	m := len(s) / 2
+	if len(s)%2 == 0 {
+		return s[m]
+	}
+	return (s[m] + s[m+1]) / 2
 }
