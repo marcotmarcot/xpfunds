@@ -23,27 +23,29 @@ func Main() {
 	optimum := xpfunds.NewOptimum(funds)
 	cdi := xpfunds.FundFromFile("cdi.tsv")
 	var strategies []strategy
-	for numFunds := 0; numFunds <= 12; numFunds++ {
+	for numFunds := 4; numFunds <= 4; numFunds++ {
 		strategies = append(strategies,
-			&random{numFunds},
-			&minAndDays{numFunds},
+			// &random{numFunds},
+			// &minAndDays{numFunds},
 			// newMl(numFunds),
 		)
 
 		// How many months to check data for. 0 for all history.
-		for numMonths := 0; numMonths <= 120; numMonths += 12 {
+		for numMonths := 0; numMonths <= 48; numMonths += 1 {
 			strategies = append(strategies,
 				&fromStart{numFunds, numMonths, false},
 				&fromStart{numFunds, numMonths, true},
 				&meanSubPeriods{numFunds, numMonths, false},
-				&meanSubPeriods{numFunds, numMonths, true})
+				&meanSubPeriods{numFunds, numMonths, true},
+				&median{numFunds, numMonths, false},
+				&median{numFunds, numMonths, true})
 		}
 	}
 
 	for _, s := range strategies {
 
 		// Discard funds that don't have at least that many months.
-		for minTime := 1; minTime <= 121; minTime += 12 {
+		for minTime := 1; minTime <= 2; minTime += 1 {
 
 			// future: Mean future return
 			// loss: Mean (future return / best possible return in future)
@@ -366,4 +368,61 @@ func meanSubPeriodsReturn(f *xpfunds.Fund, end, numMonths int) float64 {
 		start = end + numMonths
 	}
 	return f.MeanSubPeriodsReturn(end, start)
+}
+
+type median struct {
+	numFunds  int
+	numMonths int
+	reverse   bool
+}
+
+func (m *median) name() string {
+	var name string
+	if m.reverse {
+		name = "WorstMedian"
+	} else {
+		name = "BestMedian"
+	}
+	return name + strconv.Itoa(m.numFunds) + "," + strconv.Itoa(m.numMonths)
+}
+
+func (m *median) choose(funds []*xpfunds.Fund, indexes []int, end int) []int {
+	sort.Sort(byMedian{indexes, funds, end, m.numMonths, m.reverse})
+	if len(indexes) > m.numFunds {
+		indexes = indexes[:m.numFunds]
+	}
+	return indexes
+}
+
+type byMedian struct {
+	indexes   []int
+	funds     []*xpfunds.Fund
+	end       int
+	numMonths int
+	reverse   bool
+}
+
+func (b byMedian) Len() int {
+	return len(b.indexes)
+}
+
+func (b byMedian) Swap(i, j int) {
+	b.indexes[i], b.indexes[j] = b.indexes[j], b.indexes[i]
+}
+
+func (b byMedian) Less(i, j int) bool {
+	ri := medianReturn(b.funds[b.indexes[i]], b.end, b.numMonths)
+	rj := medianReturn(b.funds[b.indexes[j]], b.end, b.numMonths)
+	if b.reverse {
+		return rj > ri
+	}
+	return ri > rj
+}
+
+func medianReturn(f *xpfunds.Fund, end, numMonths int) float64 {
+	start := f.Duration()
+	if numMonths != 0 && end+numMonths < f.Duration() {
+		start = end + numMonths
+	}
+	return f.MedianReturn(end, start)
 }

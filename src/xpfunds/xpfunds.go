@@ -50,6 +50,9 @@ type Fund struct {
 	// The mean annualized return in all subperiods inside this period. Same
 	// rule as Period.
 	MeanSubPeriods [][]float64
+
+	// The annualized median return in a period.
+	Median [][]float64
 }
 
 func fundFromLine(line string) *Fund {
@@ -109,6 +112,10 @@ func (f *Fund) MeanSubPeriodsReturn(end, start int) float64 {
 	return f.MeanSubPeriods[end][start-1-end]
 }
 
+func (f *Fund) MedianReturn(end, start int) float64 {
+	return f.Median[end][start-1-end]
+}
+
 func (f *Fund) Duration() int {
 	return len(f.Period)
 }
@@ -136,6 +143,15 @@ func (f *Fund) setPeriod() {
 		for diff := range f.MeanSubPeriods[end] {
 			f.MeanSubPeriods[end][diff], err = strconv.ParseFloat(strings.Replace(fields[diff], ",", ".", 1), 64)
 			Check(err)
+		}
+	}
+	f.Median = make([][]float64, len(f.Monthly))
+	for end := range f.Monthly {
+		f.Median[end] = make([]float64, len(f.Monthly)-end)
+		var returns []float64
+		for diff := 0; diff < len(f.Monthly)-end; diff++ {
+			returns = insert(returns, f.Monthly[end+diff])
+			f.Median[end][diff] = returns[len(returns)/2]
 		}
 	}
 }
@@ -188,4 +204,14 @@ func Mean(s []float64) float64 {
 		return s[m]
 	}
 	return (s[m] + s[m+1]) / 2
+}
+
+func insert(list []float64, elem float64) []float64 {
+	var i int
+	for i = 0; i < len(list); i++ {
+		if list[i] >= elem {
+			break
+		}
+	}
+	return append(list[:i], append([]float64{elem}, list[i:]...)...)
 }
