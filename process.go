@@ -1,11 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
-	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -13,14 +13,14 @@ import (
 var numMonths = 2
 
 func main() {
-	r := bufio.NewReader(os.Stdin)
+	ipca := newIndex("ipca")
+	get, err := ioutil.ReadFile("get.tsv")
+	if err != nil {
+		log.Fatal(err)
+	}
 	var funds []*fund
-	for true {
-		line, err := r.ReadString('\n')
-		if err != nil {
-			break
-		}
-		f := newFund(line)
+	for _, line := range strings.Split(string(get), "\n") {
+		f := newFund(line, ipca)
 		if f == nil {
 			break
 		}
@@ -66,17 +66,17 @@ type fund struct {
 }
 
 // line is in the format produced by get.go.
-func newFund(line string) *fund {
+func newFund(line string, ix *index) *fund {
 	f := &fund{}
 	fields := strings.Split(strings.Trim(line, "\n"), "\t")
-	if fields == nil {
+	if len(fields) < 2 {
 		return nil
 	}
 	f.fundName = fields[0]
 	f.min = fields[1]
 	f.setDays(fields)
 	f.fundActive = fields[4]
-	f.setRaw(fields)
+	f.setRaw(fields, ix)
 	f.setGreatFall()
 	return f
 }
@@ -93,13 +93,13 @@ func (f *fund) setDays(fields []string) {
 	f.days = cot + liq
 }
 
-func (f *fund) setRaw(fields []string) {
+func (f *fund) setRaw(fields []string, ix *index) {
 	for i := 5; i < len(fields); i++ {
 		v, err := strconv.ParseFloat(strings.Replace(fields[i], ",", ".", 1), 64)
 		if err != nil {
 			log.Fatal(err)
 		}
-		f.raw = append(f.raw, v)
+		f.raw = append(f.raw, v-ix.raw[i])
 	}
 }
 
@@ -149,7 +149,7 @@ func (f *fund) stddev() string {
 		diff := v - avg
 		sumDiffs += diff * diff
 	}
-	return formatFloat(100.0 * math.Sqrt(sumDiffs/float64(len(f.raw))))
+	return formatFloat(math.Sqrt(sumDiffs / float64(len(f.raw))))
 }
 
 func (f *fund) negativeMonths() string {
@@ -163,7 +163,7 @@ func (f *fund) negativeMonths() string {
 }
 
 func (f *fund) greatestFall() string {
-	return formatFloat(f.greatFall)
+	return relative(f.greatFall)
 }
 
 func (f *fund) greatestFallLen() string {
@@ -175,7 +175,7 @@ func (f *fund) yearly() string {
 	for _, v := range f.raw {
 		total *= absolute(v)
 	}
-	return formatFloat(relative(math.Pow(total, 12.0/float64(len(f.raw)))))
+	return relative(math.Pow(total, 12.0/float64(len(f.raw))))
 }
 
 func (f *fund) lastMonths() string {
@@ -188,11 +188,21 @@ func (f *fund) lastMonths() string {
 		total *= absolute(v)
 		n++
 	}
-	return formatFloat(relative(math.Pow(total, 12.0/float64(n))))
+	return relative(math.Pow(total, 12.0/float64(n)))
 }
 
 func (f *fund) active() string {
 	return f.fundActive
+}
+
+func (f *fund) median() string {
+	if len(f.raw) == 0 {
+		return ""
+	}
+	sorted := make([]float64, len(f.raw))
+	copy(sorted, f.raw)
+	sort.Float64s(sorted)
+	return relative(math.Pow(absolute(sorted[len(sorted)/2]), 12.0))
 }
 
 type field struct {
@@ -211,7 +221,28 @@ var fields = []field{
 	{"Número de meses da maior queda", (*fund).greatestFallLen},
 	{"Rentabilidade anualizada", (*fund).yearly},
 	{"Rentabilidade nos últimos meses", (*fund).lastMonths},
+	{"Mediana da rentabilidade", (*fund).median},
 	{"Investível", (*fund).active},
+}
+
+type index struct {
+	raw []float64
+}
+
+func newIndex(name string) *index {
+	file, err := ioutil.ReadFile(name + ".tsv")
+	if err != nil {
+		log.Fatal(err)
+	}
+	ix := &index{}
+	for _, f := range strings.Split(string(file), "\n") {
+		v, err := strconv.ParseFloat(strings.Replace(f, ",", ".", 1), 64)
+		if err != nil {
+			break
+		}
+		ix.raw = append(ix.raw, v)
+	}
+	return ix
 }
 
 func formatFloat(f float64) string {
@@ -224,7 +255,8 @@ func absolute(f float64) float64 {
 	return 1.0 + f/100.0
 }
 
-// The reverse function of absolute.
-func relative(f float64) float64 {
-	return (f - 1.0) * 100.0
+// The reverse function of absolute, that also transforms it to a
+// string.
+func relative(f float64) string {
+	return formatFloat((f - 1.0) * 100.0) + "%"
 }
