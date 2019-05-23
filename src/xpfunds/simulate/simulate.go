@@ -17,13 +17,16 @@ var start_time = flag.Int("start_time", -1,
 var end_time = flag.Int("end_time", -1,
 	"The end of the evaluation period in months from the last month.")
 
+var index = flag.String("index", "",
+	"An index to subtract the gains from.")
+
 func Main() {
 	flag.Parse()
-	funds := xpfunds.ReadFunds()
+	funds := xpfunds.ReadFunds(*index)
 	optimum := xpfunds.NewOptimum(funds)
 	cdi := xpfunds.FundFromFile("cdi.tsv")
 	var strategies []strategy
-	for numFunds := 4; numFunds <= 4; numFunds++ {
+	for numFunds := 5; numFunds <= 5; numFunds++ {
 		strategies = append(strategies,
 			// &random{numFunds},
 			// &minAndDays{numFunds},
@@ -45,7 +48,7 @@ func Main() {
 	for _, s := range strategies {
 
 		// Discard funds that don't have at least that many months.
-		for minTime := 1; minTime <= 2; minTime += 1 {
+		for minTime := 1; minTime <= 12; minTime += 1 {
 
 			// future: Mean future return
 			// loss: Mean (future return / best possible return in future)

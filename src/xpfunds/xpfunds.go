@@ -16,12 +16,16 @@ func Check(err error) {
 	}
 }
 
-func ReadFunds() []*Fund {
+func ReadFunds(index string) []*Fund {
+	var ix *Fund
+	if index != "" {
+		ix = FundFromFile(index)
+	}
 	text, err := ioutil.ReadFile("get.tsv")
 	Check(err)
 	var funds []*Fund
 	for _, line := range strings.Split(string(text), "\n") {
-		f := fundFromLine(line)
+		f := fundFromLine(line, ix)
 		if f == nil {
 			continue
 		}
@@ -55,7 +59,7 @@ type Fund struct {
 	Median [][]float64
 }
 
-func fundFromLine(line string) *Fund {
+func fundFromLine(line string, ix *Fund) *Fund {
 	fields := strings.Split(strings.Trim(line, "\n"), "\t")
 	if len(fields) < 6 {
 		return nil
@@ -77,6 +81,9 @@ func fundFromLine(line string) *Fund {
 	for i := 5; i < len(fields); i++ {
 		v, err := strconv.ParseFloat(strings.Replace(fields[i], ",", ".", 1), 64)
 		Check(err)
+		if ix != nil {
+			v -= (ix.Monthly[i - 5]-1.0)*100.0
+		}
 		f.Monthly = append(f.Monthly, 1.0+v/100.0)
 	}
 	f.setPeriod()
@@ -150,7 +157,7 @@ func (f *Fund) setPeriod() {
 		f.Median[end] = make([]float64, len(f.Monthly)-end)
 		var returns []float64
 		for diff := 0; diff < len(f.Monthly)-end; diff++ {
-			returns = insert(returns, f.Monthly[end+diff])
+			returns = Insert(returns, f.Monthly[end+diff])
 			f.Median[end][diff] = returns[len(returns)/2]
 		}
 	}
@@ -206,7 +213,7 @@ func Mean(s []float64) float64 {
 	return (s[m] + s[m+1]) / 2
 }
 
-func insert(list []float64, elem float64) []float64 {
+func Insert(list []float64, elem float64) []float64 {
 	var i int
 	for i = 0; i < len(list); i++ {
 		if list[i] >= elem {
