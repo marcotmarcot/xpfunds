@@ -3,8 +3,9 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"math"
+	"os"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -15,9 +16,7 @@ var numMonths = 37
 func main() {
 	ipca := newIndex("ipca")
 	get, err := ioutil.ReadFile("get.tsv")
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	var funds []*fund
 	for _, line := range strings.Split(string(get), "\n") {
 		f := newFund(line, ipca)
@@ -63,6 +62,9 @@ type fund struct {
 
 	// The number of months the greatest fall took.
 	greatFallLen int
+
+	// The mean of the gain in all the subperiods of this fund.
+	mean float64
 }
 
 // line is in the format produced by get.go.
@@ -78,27 +80,22 @@ func newFund(line string, ix *index) *fund {
 	f.fundActive = fields[4]
 	f.setRaw(fields, ix)
 	f.setGreatFall()
+	f.readMSB()
 	return f
 }
 
 func (f *fund) setDays(fields []string) {
 	cot, err := strconv.Atoi(fields[2])
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	liq, err := strconv.Atoi(fields[3])
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	f.days = cot + liq
 }
 
 func (f *fund) setRaw(fields []string, ix *index) {
 	for i := 5; i < len(fields); i++ {
 		v, err := strconv.ParseFloat(strings.Replace(fields[i], ",", ".", 1), 64)
-		if err != nil {
-			log.Fatal(err)
-		}
+		check(err)
 		f.raw = append(f.raw, v-ix.raw[i])
 	}
 }
@@ -120,6 +117,23 @@ func (f *fund) setGreatFall() {
 			f.greatFallLen = currLen
 		}
 	}
+}
+
+func (f *fund) readMSB() {
+	file := path.Join("subperiods", f.fundName+".tsv")
+	text, err := ioutil.ReadFile(file)
+	if os.IsNotExist(err) {
+		return
+	}
+	check(err)
+	lines := strings.Split(string(text), "\n")
+	month := len(lines)-2-numMonths
+	if month < 0 {
+		month = 0
+	}
+	fields := strings.Split(lines[month], "\t")
+	f.mean, err = strconv.ParseFloat(strings.Replace(fields[len(fields)-2], ",", ".", 1), 64)
+	check(err)
 }
 
 func (f *fund) name() string {
@@ -205,6 +219,10 @@ func (f *fund) median() string {
 	return relative(math.Pow(absolute(sorted[len(sorted)/2]), 12.0))
 }
 
+func (f *fund) msb() string {
+	return formatFloat(f.mean)
+}
+
 type field struct {
 	name  string
 	value func(f *fund) string
@@ -223,6 +241,7 @@ var fields = []field{
 	{"Rentabilidade nos últimos meses", (*fund).lastMonths},
 	{"Mediana da rentabilidade", (*fund).median},
 	{"Investível", (*fund).active},
+	{"Média dos subperíodos", (*fund).msb},
 }
 
 type index struct {
@@ -231,9 +250,7 @@ type index struct {
 
 func newIndex(name string) *index {
 	file, err := ioutil.ReadFile(name + ".tsv")
-	if err != nil {
-		log.Fatal(err)
-	}
+	check(err)
 	ix := &index{}
 	for _, f := range strings.Split(string(file), "\n") {
 		v, err := strconv.ParseFloat(strings.Replace(f, ",", ".", 1), 64)
@@ -260,3 +277,10 @@ func absolute(f float64) float64 {
 func relative(f float64) string {
 	return formatFloat((f - 1.0) * 100.0) + "%"
 }
+
+func check(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+

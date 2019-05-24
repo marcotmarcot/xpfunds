@@ -10,7 +10,7 @@ import (
 func main() {
 	xpfunds.Check(os.Mkdir("subperiods", 0775))
 	cdi := xpfunds.FundFromFile("cdi.tsv")
-	for _, f := range xpfunds.ReadFunds() {
+	for _, f := range xpfunds.ReadFunds("") {
 		meanSubPeriods := make([][]float64, len(f.Monthly))
 		for end := range f.Monthly {
 			meanSubPeriods[end] = make([]float64, len(f.Monthly)-end)
