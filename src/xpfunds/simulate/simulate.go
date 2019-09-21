@@ -3,11 +3,8 @@ package simulate
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
-	"math/rand"
 	"sort"
 	"strconv"
-	"strings"
 	"xpfunds"
 )
 
@@ -26,15 +23,9 @@ func Main() {
 	optimum := xpfunds.NewOptimum(funds)
 	cdi := xpfunds.FundFromFile("cdi.tsv")
 	var strategies []strategy
-	for numFunds := 5; numFunds <= 5; numFunds++ {
-		strategies = append(strategies,
-			// &random{numFunds},
-			// &minAndDays{numFunds},
-			// newMl(numFunds),
-		)
-
-		// How many months to check data for. 0 for all history.
-		for numMonths := 0; numMonths <= 48; numMonths += 1 {
+	for numFunds := 1; numFunds <= 10; numFunds++ {
+		// How many months to check data for
+		for numMonths := 1; numMonths <= 240; numMonths += 12 {
 			strategies = append(strategies,
 				&fromStart{numFunds, numMonths, false},
 				&fromStart{numFunds, numMonths, true},
@@ -48,14 +39,14 @@ func Main() {
 	for _, s := range strategies {
 
 		// Discard funds that don't have at least that many months.
-		for minTime := 1; minTime <= 12; minTime += 1 {
+		for minTime := 1; minTime <= 240; minTime += 12 {
 
 			// future: Mean future return
 			// loss: Mean (future return / best possible return in future)
 			// cdi_ratio: Mean (future return / cdi)
 			// min: Minimal future return
 			future, loss, cdi_ratio, min := meanPerformance(funds, cdi, optimum, s, minTime)
-			fmt.Println(s.name(), minTime, future, loss, cdi_ratio, min)
+			fmt.Printf("%v\t%v\t%v\t%v\t%v\t%v\n", s.name(), minTime, future, loss, cdi_ratio, min)
 		}
 	}
 }
@@ -88,7 +79,7 @@ func meanPerformance(funds []*xpfunds.Fund, cdi, optimum *xpfunds.Fund, s strate
 		// Filter using minTime.
 		var filtered []int
 		for _, i := range allIndexes {
-			if funds[i].Duration()-time > minTime {
+			if funds[i].Duration()-time > minTime && funds[i].Duration()-time > s.months() {
 				filtered = append(filtered, i)
 			}
 		}
@@ -123,7 +114,7 @@ func performance(funds []*xpfunds.Fund, optimum *xpfunds.Fund, indexes []int, s 
 	for _, i := range indexes {
 		total_future += funds[i].Return(0, time)
 	}
-	return xpfunds.Annual(total_future / float64(len(indexes)), 0, time)
+	return xpfunds.Annual(total_future/float64(len(indexes)), 0, time)
 }
 
 type strategy interface {
@@ -132,26 +123,8 @@ type strategy interface {
 	// Given a list of valid index, return them in the order they should be
 	// picked. Only consider data in funds up to end (inclusive).
 	choose(funds []*xpfunds.Fund, indexes []int, end int) []int
-}
 
-type random struct {
-	numFunds int
-}
-
-func (r *random) name() string {
-	return "Random" + strconv.Itoa(r.numFunds)
-}
-
-func (r *random) choose(funds []*xpfunds.Fund, indexes []int, end int) []int {
-	// Shuffles the indexes slice.
-	chosen := make([]int, len(indexes))
-	for i, index := range rand.Perm(len(indexes)) {
-		chosen[i] = indexes[index]
-	}
-	if len(chosen) > r.numFunds {
-		chosen = chosen[:r.numFunds]
-	}
-	return chosen
+	months() int
 }
 
 type fromStart struct {
@@ -176,6 +149,10 @@ func (f *fromStart) choose(funds []*xpfunds.Fund, indexes []int, end int) []int 
 		indexes = indexes[:f.numFunds]
 	}
 	return indexes
+}
+
+func (f *fromStart) months() int {
+	return f.numMonths
 }
 
 type byReturnFromStart struct {
@@ -204,116 +181,10 @@ func (b byReturnFromStart) Less(i, j int) bool {
 }
 
 func returnFromStart(f *xpfunds.Fund, end, numMonths int) float64 {
-	start := f.Duration()
-	if numMonths != 0 && end+numMonths < f.Duration() {
-		start = end + numMonths
+	if end+numMonths >= f.Duration() {
+		return -9999
 	}
-	return f.Annual(end, start)
-}
-
-type ml struct {
-	numFunds  int
-	predicted map[fundTime]float64
-}
-
-func newMl(numFunds int) *ml {
-	metadata_text, err := ioutil.ReadFile("test_metadata.tsv")
-	xpfunds.Check(err)
-	predictions_text, err := ioutil.ReadFile("test_predictions.tsv")
-	xpfunds.Check(err)
-	metadata_lines := strings.Split(string(metadata_text), "\n")
-	predictions_lines := strings.Split(string(predictions_text), "\n")
-	ml := &ml{numFunds, make(map[fundTime]float64)}
-	for i := range metadata_lines {
-		fields := strings.Split(strings.Trim(metadata_lines[i], "\n"), "\t")
-		if len(fields) < 2 {
-			continue
-		}
-		time, err := strconv.Atoi(fields[1])
-		xpfunds.Check(err)
-		label, err := strconv.ParseFloat(predictions_lines[i], 64)
-		xpfunds.Check(err)
-		ml.predicted[fundTime{fields[0], time}] = label
-	}
-	return ml
-}
-
-type fundTime struct {
-	name string
-	time int
-}
-
-func (m *ml) name() string {
-	return "Ml" + strconv.Itoa(m.numFunds)
-}
-
-func (m *ml) choose(funds []*xpfunds.Fund, indexes []int, end int) []int {
-	sort.Sort(byMl{indexes, funds, end, m.predicted})
-	if len(indexes) > m.numFunds {
-		indexes = indexes[:m.numFunds]
-	}
-	return indexes
-}
-
-type byMl struct {
-	indexes   []int
-	funds     []*xpfunds.Fund
-	end       int
-	predicted map[fundTime]float64
-}
-
-func (b byMl) Len() int {
-	return len(b.indexes)
-}
-
-func (b byMl) Swap(i, j int) {
-	b.indexes[i], b.indexes[j] = b.indexes[j], b.indexes[i]
-}
-
-func (b byMl) Less(i, j int) bool {
-	ri := b.predicted[fundTime{b.funds[b.indexes[i]].Name, b.end}]
-	rj := b.predicted[fundTime{b.funds[b.indexes[j]].Name, b.end}]
-	return ri > rj
-}
-
-type minAndDays struct {
-	numFunds int
-}
-
-func (m *minAndDays) name() string {
-	return "MinAndDays" + strconv.Itoa(m.numFunds)
-}
-
-func (m *minAndDays) choose(funds []*xpfunds.Fund, indexes []int, end int) []int {
-	sort.Sort(byMinAndDays{indexes, funds})
-	if len(indexes) > m.numFunds {
-		indexes = indexes[:m.numFunds]
-	}
-	return indexes
-}
-
-type byMinAndDays struct {
-	indexes []int
-	funds   []*xpfunds.Fund
-}
-
-func (b byMinAndDays) Len() int {
-	return len(b.indexes)
-}
-
-func (b byMinAndDays) Swap(i, j int) {
-	b.indexes[i], b.indexes[j] = b.indexes[j], b.indexes[i]
-}
-
-func (b byMinAndDays) Less(i, j int) bool {
-	mi := b.funds[b.indexes[i]].Min
-	mj := b.funds[b.indexes[j]].Min
-	if mi == mj {
-		di := b.funds[b.indexes[i]].Days
-		dj := b.funds[b.indexes[j]].Days
-		return di < dj
-	}
-	return mi < mj
+	return f.Annual(end, end + numMonths)
 }
 
 type meanSubPeriods struct {
@@ -338,6 +209,10 @@ func (m *meanSubPeriods) choose(funds []*xpfunds.Fund, indexes []int, end int) [
 		indexes = indexes[:m.numFunds]
 	}
 	return indexes
+}
+
+func (m *meanSubPeriods) months() int {
+	return m.numMonths
 }
 
 type byMeanSubPeriods struct {
@@ -366,11 +241,10 @@ func (b byMeanSubPeriods) Less(i, j int) bool {
 }
 
 func meanSubPeriodsReturn(f *xpfunds.Fund, end, numMonths int) float64 {
-	start := f.Duration()
-	if numMonths != 0 && end+numMonths < f.Duration() {
-		start = end + numMonths
+	if end+numMonths >= f.Duration() {
+		return -9999
 	}
-	return f.MeanSubPeriodsReturn(end, start)
+	return f.MeanSubPeriodsReturn(end, end+numMonths)
 }
 
 type median struct {
@@ -395,6 +269,10 @@ func (m *median) choose(funds []*xpfunds.Fund, indexes []int, end int) []int {
 		indexes = indexes[:m.numFunds]
 	}
 	return indexes
+}
+
+func (m *median) months() int {
+	return m.numMonths
 }
 
 type byMedian struct {
@@ -423,9 +301,8 @@ func (b byMedian) Less(i, j int) bool {
 }
 
 func medianReturn(f *xpfunds.Fund, end, numMonths int) float64 {
-	start := f.Duration()
-	if numMonths != 0 && end+numMonths < f.Duration() {
-		start = end + numMonths
+	if end+numMonths >= f.Duration() {
+		return -9999
 	}
-	return f.MedianReturn(end, start)
+	return f.MedianReturn(end, end+numMonths)
 }

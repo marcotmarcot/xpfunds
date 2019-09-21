@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-var numMonths = 37
+var numMonths = 97
 
 func main() {
 	ipca := newIndex("ipca")
