@@ -14,9 +14,6 @@ var start_time = flag.Int("start_time", -1,
 var end_time = flag.Int("end_time", -1,
 	"The end of the evaluation period in months from the last month.")
 
-var index = flag.String("index", "",
-	"An index to subtract the gains from.")
-
 func Main() {
 	flag.Parse()
 	funds := xpfunds.ReadFunds(*index)
@@ -184,7 +181,7 @@ func returnFromStart(f *xpfunds.Fund, end, numMonths int) float64 {
 	if end+numMonths >= f.Duration() {
 		return -9999
 	}
-	return f.Annual(end, end + numMonths)
+	return f.Annual(end, end+numMonths)
 }
 
 type meanSubPeriods struct {
