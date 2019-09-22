@@ -31,6 +31,16 @@ func TestFields(t *testing.T) {
 		0,
 		1,
 		0.5,
+	}, {
+		"greatestFall",
+		1,
+		0.9,
+		0.9,
+	}, {
+		"greatestFallLen",
+		0,
+		1,
+		1,
 	}}
 	for _, test := range tests {
 		f := NewFund("", []float64{1.1, 0.9})

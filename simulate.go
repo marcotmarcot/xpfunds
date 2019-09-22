@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	minMonths   = 12
+	minMonths   = 6
 	maxNumFunds = 10
 )
 

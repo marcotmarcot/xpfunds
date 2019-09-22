@@ -33,6 +33,7 @@ func (f *Fund) setFields() {
 	f.setMedian()
 	f.setStdDev()
 	f.setNegativeMonthRatio()
+	f.setGreatestFall()
 }
 
 func (f *Fund) setReturn() {
@@ -92,6 +93,33 @@ func (f *Fund) setNegativeMonthRatio() {
 				nonNegative++
 			}
 			f.fields["negativeMonthRatio"][end][diff] = float64(negative) / float64(negative+nonNegative)
+		}
+	}
+}
+
+func (f *Fund) setGreatestFall() {
+	f.fields["greatestFall"] = make([][]float64, len(f.monthly))
+	f.fields["greatestFallLen"] = make([][]float64, len(f.monthly))
+	for end := range f.monthly {
+		f.fields["greatestFall"][end] = make([]float64, len(f.monthly)-end)
+		f.fields["greatestFallLen"][end] = make([]float64, len(f.monthly)-end)
+		greatestFall := 1.0
+		greatestFallLen := 0
+		curr := 1.0
+		currLen := 0
+		for diff := 0; diff < len(f.monthly)-end; diff++ {
+			curr *= f.monthly[end+diff]
+			currLen++
+			if f.monthly[end+diff] < curr {
+				curr = f.monthly[end+diff]
+				currLen = 1
+			}
+			if curr < greatestFall {
+				greatestFall = curr
+				greatestFallLen = currLen
+			}
+			f.fields["greatestFall"][end][diff] = greatestFall
+			f.fields["greatestFallLen"][end][diff] = float64(greatestFallLen)
 		}
 	}
 }
