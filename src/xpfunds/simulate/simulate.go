@@ -68,7 +68,7 @@ func (w Weighted) Name() string {
 
 func (w Weighted) Choose(funds []*xpfunds.Fund, end int) []*xpfunds.Fund {
 	l := largestn.NewLargestN(w.NumFunds)
-	for _, f := range funds {
+	for i, f := range funds {
 		if f.Duration()-end < w.IgnoreWithoutMonths {
 			continue
 		}
@@ -76,7 +76,11 @@ func (w Weighted) Choose(funds []*xpfunds.Fund, end int) []*xpfunds.Fund {
 		if w.MonthsToRead == 0 {
 			start = f.Duration()
 		}
-		l.Add(f, f.Weighted(w.Weight, end, start))
+		l.Add(i, f.Weighted(w.Weight, end, start))
 	}
-	return l.Funds
+	chosen := make([]*xpfunds.Fund, len(l.Indexes))
+	for i, index := range l.Indexes {
+		chosen[i] = funds[index]
+	}
+	return chosen
 }

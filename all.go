@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	minMonths   = 6
-	maxNumFunds = 10
+	maxNumMonths = 60
+	maxNumFunds  = 10
 )
 
 func main() {
@@ -23,10 +23,10 @@ func main() {
 		}
 	}
 	var strategies []simulate.Strategy
-	for numFunds := 1; numFunds <= maxNumFunds; numFunds++ {
+	for numFunds := maxNumFunds; numFunds <= maxNumFunds; numFunds++ {
 		strategies = append(strategies, random{numFunds})
-		for monthsToRead := 0; monthsToRead <= minMonths; monthsToRead++ {
-			for ignoreWithoutMonths := monthsToRead; ignoreWithoutMonths <= minMonths; ignoreWithoutMonths++ {
+		for monthsToRead := 0; monthsToRead <= maxNumMonths; monthsToRead++ {
+			for ignoreWithoutMonths := monthsToRead; ignoreWithoutMonths <= maxNumMonths; ignoreWithoutMonths++ {
 				for _, value := range []float64{-1, 1} {
 					for _, field := range funds[0].Fields() {
 						strategies = append(strategies, simulate.Weighted{numFunds, monthsToRead, ignoreWithoutMonths, map[string]float64{field: value}})
@@ -39,7 +39,7 @@ func main() {
 	c := make(chan string)
 	for _, s := range strategies {
 		go func(s simulate.Strategy) {
-			c <- fmt.Sprintf("%v\t%v\n", s.Name(), simulate.MedianPerformance(funds, maxDuration-minMonths, maxNumFunds, s))
+			c <- fmt.Sprintf("%v\t%v\n", s.Name(), simulate.MedianPerformance(funds, maxDuration-maxNumMonths, maxNumFunds, s))
 		}(s)
 	}
 	for range strategies {

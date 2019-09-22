@@ -18,6 +18,7 @@ func NewWeights(fields []string, n int) []map[string]float64 {
 		}
 		weights = append(weights, weight)
 	}
+	return weights
 }
 
 func Reproduce(a, b map[string]float64, n int) []map[string]float64 {
@@ -25,7 +26,7 @@ func Reproduce(a, b map[string]float64, n int) []map[string]float64 {
 	for i := 0; i < n-2; i++ {
 		weight := make(map[string]float64)
 		for field, avalue := range a {
-			weight[field] = (avalue+b[field])/2 + rand.NormFloat()
+			weight[field] = (avalue+b[field])/2 + rand.NormFloat64()*1
 			for weight[field] < -1 {
 				weight[field] += 2
 			}
@@ -35,4 +36,5 @@ func Reproduce(a, b map[string]float64, n int) []map[string]float64 {
 		}
 		weights = append(weights, weight)
 	}
+	return weights
 }

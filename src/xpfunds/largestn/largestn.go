@@ -1,12 +1,11 @@
 package largestn
 
 import (
-	"xpfunds"
 	"xpfunds/binarysearch"
 )
 
 type LargestN struct {
-	Funds   []*xpfunds.Fund
+	Indexes []int
 	n       int
 	returns []float64
 }
@@ -15,7 +14,7 @@ func NewLargestN(n int) *LargestN {
 	return &LargestN{nil, n, nil}
 }
 
-func (l *LargestN) Add(f *xpfunds.Fund, r float64) {
+func (l *LargestN) Add(index int, r float64) {
 	i := binarysearch.UpperBound(l.returns, r)
 	if len(l.returns) == l.n && i == 0 {
 		return
@@ -25,5 +24,5 @@ func (l *LargestN) Add(f *xpfunds.Fund, r float64) {
 		start = 0
 	}
 	l.returns = append(l.returns[start:i], append([]float64{r}, l.returns[i:]...)...)
-	l.Funds = append(l.Funds[start:i], append([]*xpfunds.Fund{f}, l.Funds[i:]...)...)
+	l.Indexes = append(l.Indexes[start:i], append([]int{index}, l.Indexes[i:]...)...)
 }

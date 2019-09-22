@@ -3,49 +3,44 @@ package largestn
 import (
 	"reflect"
 	"testing"
-	"xpfunds"
 )
 
 type element struct {
 	ret float64
-	f   string
+	i   int
 }
 
 func TestLargestN(t *testing.T) {
 	tests := []struct {
 		name     string
 		elements []element
-		want     []string
+		want     []int
 	}{{
 		"asc",
 		[]element{
-			{1, "1"},
-			{2, "2"},
-			{3, "3"},
-			{4, "4"},
+			{1, 1},
+			{2, 2},
+			{3, 3},
+			{4, 4},
 		},
-		[]string{"3", "4"},
+		[]int{3, 4},
 	}, {
 		"desc",
 		[]element{
-			{4, "4"},
-			{3, "3"},
-			{2, "2"},
-			{1, "1"},
+			{4, 1},
+			{3, 2},
+			{2, 3},
+			{1, 4},
 		},
-		[]string{"3", "4"},
+		[]int{2, 1},
 	}}
 	for _, test := range tests {
 		l := NewLargestN(2)
 		for _, e := range test.elements {
-			l.Add(xpfunds.NewFund(e.f, nil), e.ret)
+			l.Add(e.i, e.ret)
 		}
-		var want []*xpfunds.Fund
-		for _, n := range test.want {
-			want = append(want, xpfunds.NewFund(n, nil))
-		}
-		if got := l.Funds; !reflect.DeepEqual(got, want) {
-			t.Errorf("%v: got: %v, want: %v", test.name, got, want)
+		if got := l.Indexes; !reflect.DeepEqual(got, test.want) {
+			t.Errorf("%v: got: %v, want: %v", test.name, got, test.want)
 		}
 	}
 }
