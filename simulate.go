@@ -24,7 +24,7 @@ func main() {
 		for monthsToRead := 0; monthsToRead <= minMonths; monthsToRead++ {
 			for ignoreWithoutMonths := monthsToRead; ignoreWithoutMonths <= minMonths; ignoreWithoutMonths++ {
 				for _, reverse := range []bool{false, true} {
-					for field := range xpfunds.Fields {
+					for _, field := range optimum.Fields() {
 						strategies = append(strategies, bestInPeriod{numFunds, monthsToRead, ignoreWithoutMonths, reverse, field})
 					}
 				}
@@ -54,7 +54,7 @@ func medianLoss(funds []*xpfunds.Fund, optimum *xpfunds.Fund, s strategy, c chan
 		if len(active) < maxNumFunds+1 {
 			continue
 		}
-		losses = append(losses, performance(active, s, time)/optimum.Ret(0, time))
+		losses = append(losses, performance(active, s, time)/optimum.Field("return", 0, time))
 	}
 	c <- fmt.Sprintf("%v\t%v\n", s.name(), median(losses))
 }
@@ -78,7 +78,7 @@ func performance(funds []*xpfunds.Fund, s strategy, time int) float64 {
 	chosenFunds := s.choose(funds, time)
 	total := 0.0
 	for _, f := range chosenFunds {
-		total += f.Ret(0, time)
+		total += f.Field("return", 0, time)
 	}
 	return total / float64(len(chosenFunds))
 }
@@ -126,7 +126,7 @@ func (b bestInPeriod) choose(funds []*xpfunds.Fund, end int) []*xpfunds.Fund {
 		if b.monthsToRead == 0 {
 			start = f.Duration()
 		}
-		l.Add(f, xpfunds.Fields[b.field](f, end, start))
+		l.Add(f, f.Field(b.field, end, start))
 	}
 	return l.Funds
 }
