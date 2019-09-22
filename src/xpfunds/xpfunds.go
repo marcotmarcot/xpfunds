@@ -16,6 +16,8 @@ type Fund struct {
 	monthly []float64
 
 	fields map[string][][]float64
+
+	ratio map[string][][]float64
 }
 
 func NewFund(n string, monthly []float64) *Fund {
@@ -23,6 +25,7 @@ func NewFund(n string, monthly []float64) *Fund {
 		Name:    n,
 		monthly: monthly,
 		fields:  make(map[string][][]float64),
+		ratio:   make(map[string][][]float64),
 	}
 	f.setFields()
 	return f
@@ -135,6 +138,7 @@ func ReadFunds() []*Fund {
 		}
 		funds = append(funds, f)
 	}
+	setRatio(funds)
 	return funds
 }
 
@@ -168,17 +172,27 @@ func (f *Fund) Fields() []string {
 }
 
 // End is inclusive, start is exclusive
-func (f *Fund) Field(field string, end, start int) float64 {
-	return f.fields[field][end][start-1-end]
+func (f *Fund) Weighted(weight map[string]float64, end, start int) float64 {
+	total := 0.0
+	for field, value := range weight {
+		total += f.ratio[field][end][start-1-end] * value
+	}
+	return total
 }
 
-func NewOptimum(funds []*Fund) *Fund {
+func setRatio(funds []*Fund) {
 	optimum := &Fund{fields: make(map[string][][]float64)}
 	duration := maxDuration(funds)
 	for _, field := range funds[0].Fields() {
 		optimum.fields[field] = make([][]float64, duration)
+		for _, f := range funds {
+			f.ratio[field] = make([][]float64, duration)
+		}
 		for end := range optimum.fields[field] {
 			optimum.fields[field][end] = make([]float64, duration-end)
+			for _, f := range funds {
+				f.ratio[field][end] = make([]float64, duration-end)
+			}
 			for diff := 0; diff < duration-end; diff++ {
 				optimum.fields[field][end][diff] = -999999.99
 				for _, fund := range funds {
@@ -189,10 +203,19 @@ func NewOptimum(funds []*Fund) *Fund {
 						optimum.fields[field][end][diff] = fund.fields[field][end][diff]
 					}
 				}
+				for _, f := range funds {
+					if f.Duration() <= end+diff {
+						continue
+					}
+					if optimum.fields[field][end][diff] == 0 {
+						f.ratio[field][end][diff] = 1
+						continue
+					}
+					f.ratio[field][end][diff] = f.fields[field][end][diff] / optimum.fields[field][end][diff]
+				}
 			}
 		}
 	}
-	return optimum
 }
 
 func maxDuration(funds []*Fund) int {

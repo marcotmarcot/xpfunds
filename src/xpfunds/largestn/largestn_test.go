@@ -15,51 +15,28 @@ func TestLargestN(t *testing.T) {
 	tests := []struct {
 		name     string
 		elements []element
-		reverse  bool
 		want     []string
 	}{{
-		"noReverseAsc",
+		"asc",
 		[]element{
 			{1, "1"},
 			{2, "2"},
 			{3, "3"},
 			{4, "4"},
 		},
-		false,
 		[]string{"3", "4"},
 	}, {
-		"noReverseDesc",
+		"desc",
 		[]element{
 			{4, "4"},
 			{3, "3"},
 			{2, "2"},
 			{1, "1"},
 		},
-		false,
 		[]string{"3", "4"},
-	}, {
-		"reverse",
-		[]element{
-			{1, "1"},
-			{2, "2"},
-			{3, "3"},
-			{4, "4"},
-		},
-		true,
-		[]string{"1", "2"},
-	}, {
-		"reverseDesc",
-		[]element{
-			{4, "4"},
-			{3, "3"},
-			{2, "2"},
-			{1, "1"},
-		},
-		true,
-		[]string{"1", "2"},
 	}}
 	for _, test := range tests {
-		l := NewLargestN(2, test.reverse)
+		l := NewLargestN(2)
 		for _, e := range test.elements {
 			l.Add(xpfunds.NewFund(e.f, nil), e.ret)
 		}
