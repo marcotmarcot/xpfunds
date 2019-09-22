@@ -24,6 +24,8 @@ type Fund struct {
 	median [][]float64
 
 	stdDev [][]float64
+
+	negativeMonthRatio [][]float64
 }
 
 func NewFund(n string, monthly []float64) *Fund {
@@ -72,6 +74,7 @@ func (f *Fund) setFields() {
 	f.setRet()
 	f.setMedian()
 	f.setStdDev()
+	f.setNegativeMonthRatio()
 }
 
 func (f *Fund) setRet() {
@@ -128,9 +131,29 @@ func (f *Fund) setStdDev() {
 	}
 }
 
-// Returns the median return in period, similar to 'Ret'.
 func (f *Fund) stdDevInPeriod(end, start int) float64 {
 	return f.stdDev[end][start-1-end]
+}
+
+func (f *Fund) setNegativeMonthRatio() {
+	f.negativeMonthRatio = make([][]float64, len(f.monthly))
+	for end := range f.monthly {
+		f.negativeMonthRatio[end] = make([]float64, len(f.monthly)-end)
+		negative := 0
+		nonNegative := 0
+		for diff := 0; diff < len(f.monthly)-end; diff++ {
+			if f.monthly[end+diff] < 1 {
+				negative++
+			} else {
+				nonNegative++
+			}
+			f.negativeMonthRatio[end][diff] = float64(negative) / float64(negative+nonNegative)
+		}
+	}
+}
+
+func (f *Fund) negativeMonthRatioInPeriod(end, start int) float64 {
+	return f.negativeMonthRatio[end][start-1-end]
 }
 
 func NewOptimum(funds []*Fund) *Fund {
@@ -164,7 +187,8 @@ func maxDuration(funds []*Fund) int {
 }
 
 var Fields = map[string]func(f *Fund, start, end int) float64{
-	"ret":    (*Fund).Ret,
-	"median": (*Fund).medianInPeriod,
-	"stdDev": (*Fund).stdDevInPeriod,
+	"ret":                (*Fund).Ret,
+	"median":             (*Fund).medianInPeriod,
+	"stdDev":             (*Fund).stdDevInPeriod,
+	"negativeMonthRatio": (*Fund).negativeMonthRatioInPeriod,
 }

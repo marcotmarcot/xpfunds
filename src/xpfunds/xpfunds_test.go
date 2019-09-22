@@ -14,30 +14,35 @@ func TestFields(t *testing.T) {
 	}{{
 		"ret",
 		1.1,
-		1.2,
-		1.32,
+		0.9,
+		0.99,
 	}, {
 		"median",
 		1.1,
-		1.2,
-		1.15,
+		0.9,
+		1,
 	}, {
 		"stdDev",
 		0,
 		0,
-		0.05,
+		0.1,
+	}, {
+		"negativeMonthRatio",
+		0,
+		1,
+		0.5,
 	}}
 	for _, test := range tests {
-		f := NewFund("", []float64{1.1, 1.2})
+		f := NewFund("", []float64{1.1, 0.9})
 		f.setFields()
 		if got, want := Fields[test.field](f, 0, 1), test.expected01; !eq(got, want) {
-			t.Errorf("got: %v, want: %v", got, want)
+			t.Errorf("%v: got: %v, want: %v", test.field, got, want)
 		}
 		if got, want := Fields[test.field](f, 1, 2), test.expected12; !eq(got, want) {
-			t.Errorf("got: %v, want: %v", got, want)
+			t.Errorf("%v: got: %v, want: %v", test.field, got, want)
 		}
 		if got, want := Fields[test.field](f, 0, 2), test.expected02; !eq(got, want) {
-			t.Errorf("got: %v, want: %v", got, want)
+			t.Errorf("%v: got: %v, want: %v", test.field, got, want)
 		}
 	}
 }

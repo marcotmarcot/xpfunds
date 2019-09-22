@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	minMonths   = 1
-	maxNumFunds = 3
+	minMonths   = 12
+	maxNumFunds = 10
 )
 
 func main() {
