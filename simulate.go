@@ -6,31 +6,42 @@ import (
 	"sort"
 	"time"
 	"xpfunds"
+	"xpfunds/largestn"
 )
 
-var minMonths = 12
+var (
+	minMonths   = 1
+	maxNumFunds = 3
+)
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	funds := xpfunds.ReadFunds()
 	optimum := xpfunds.NewOptimum(funds)
-	strategies := []strategy{random{}}
-	for monthsToRead := 0; monthsToRead <= minMonths; monthsToRead++ {
-		for ignoreWithoutMonths := monthsToRead + 1; ignoreWithoutMonths <= minMonths; ignoreWithoutMonths++ {
-			for _, reverse := range []bool{false, true} {
-				strategies = append(strategies,
-					bestInPeriod{monthsToRead, ignoreWithoutMonths, reverse, "return", (*xpfunds.Fund).Return},
-					bestInPeriod{monthsToRead, ignoreWithoutMonths, reverse, "median", (*xpfunds.Fund).MedianReturn})
+	var strategies []strategy
+	for numFunds := 1; numFunds <= maxNumFunds; numFunds++ {
+		strategies = append(strategies, random{numFunds})
+		for monthsToRead := 0; monthsToRead <= minMonths; monthsToRead++ {
+			for ignoreWithoutMonths := monthsToRead; ignoreWithoutMonths <= minMonths; ignoreWithoutMonths++ {
+				for _, reverse := range []bool{false, true} {
+					for field := range xpfunds.Fields {
+						strategies = append(strategies, bestInPeriod{numFunds, monthsToRead, ignoreWithoutMonths, reverse, field})
+					}
+				}
 			}
 		}
 	}
 
+	c := make(chan string)
 	for _, s := range strategies {
-		fmt.Printf("%v\t%v\n", s.name(), medianLoss(funds, optimum, s))
+		go medianLoss(funds, optimum, s, c)
+	}
+	for range strategies {
+		fmt.Printf(<-c)
 	}
 }
 
-func medianLoss(funds []*xpfunds.Fund, optimum *xpfunds.Fund, s strategy) float64 {
+func medianLoss(funds []*xpfunds.Fund, optimum *xpfunds.Fund, s strategy, c chan string) {
 	var losses []float64
 
 	for time := optimum.Duration() - minMonths - 2; time >= 1; time-- {
@@ -40,12 +51,12 @@ func medianLoss(funds []*xpfunds.Fund, optimum *xpfunds.Fund, s strategy) float6
 				active = append(active, f)
 			}
 		}
-		if len(active) < 2 {
+		if len(active) < maxNumFunds+1 {
 			continue
 		}
-		losses = append(losses, performance(active, s, time)/optimum.Return(0, time))
+		losses = append(losses, performance(active, s, time)/optimum.Ret(0, time))
 	}
-	return median(losses)
+	c <- fmt.Sprintf("%v\t%v\n", s.name(), median(losses))
 }
 
 func median(s []float64) float64 {
@@ -64,46 +75,49 @@ func median(s []float64) float64 {
 }
 
 func performance(funds []*xpfunds.Fund, s strategy, time int) float64 {
-	best := s.choose(funds, time)
-	return best.Return(0, time)
+	chosenFunds := s.choose(funds, time)
+	total := 0.0
+	for _, f := range chosenFunds {
+		total += f.Ret(0, time)
+	}
+	return total / float64(len(chosenFunds))
 }
 
 type strategy interface {
 	name() string
 
-	// Given a list of valid index, return them in the order they should be
-	// picked. Only consider data in funds up to end (inclusive).
-	choose(funds []*xpfunds.Fund, end int) *xpfunds.Fund
+	choose(funds []*xpfunds.Fund, end int) []*xpfunds.Fund
 }
 
-type random struct{}
+type random struct {
+	numFunds int
+}
 
 func (r random) name() string {
-	return "random"
+	return fmt.Sprintf("random(%v)", r.numFunds)
 }
 
-func (r random) choose(funds []*xpfunds.Fund, end int) *xpfunds.Fund {
-	return funds[rand.Int()%len(funds)]
+func (r random) choose(funds []*xpfunds.Fund, end int) []*xpfunds.Fund {
+	rand.Shuffle(len(funds), func(i, j int) {
+		funds[i], funds[j] = funds[j], funds[i]
+	})
+	return funds[:r.numFunds]
 }
 
 type bestInPeriod struct {
+	numFunds            int
 	monthsToRead        int
 	ignoreWithoutMonths int
 	reverse             bool
-	retName             string
-	ret                 func(f *xpfunds.Fund, end, start int) float64
+	field               string
 }
 
 func (b bestInPeriod) name() string {
-	return fmt.Sprintf("bestInPeriod(%v,%v,%v,%v)", b.monthsToRead, b.ignoreWithoutMonths, b.reverse, b.retName)
+	return fmt.Sprintf("bestInPeriod(%v,%v,%v,%v,%v)", b.numFunds, b.monthsToRead, b.ignoreWithoutMonths, b.reverse, b.field)
 }
 
-func (b bestInPeriod) choose(funds []*xpfunds.Fund, end int) *xpfunds.Fund {
-	bestReturn := -999999.99
-	if b.reverse {
-		bestReturn = 999999.99
-	}
-	var bestFund *xpfunds.Fund
+func (b bestInPeriod) choose(funds []*xpfunds.Fund, end int) []*xpfunds.Fund {
+	l := largestn.NewLargestN(b.numFunds, b.reverse)
 	for _, f := range funds {
 		if f.Duration()-end < b.ignoreWithoutMonths {
 			continue
@@ -112,11 +126,7 @@ func (b bestInPeriod) choose(funds []*xpfunds.Fund, end int) *xpfunds.Fund {
 		if b.monthsToRead == 0 {
 			start = f.Duration()
 		}
-		r := b.ret(f, end, start)
-		if (!b.reverse && r > bestReturn) || (b.reverse && r < bestReturn) {
-			bestReturn = r
-			bestFund = f
-		}
+		l.Add(f, xpfunds.Fields[b.field](f, end, start))
 	}
-	return bestFund
+	return l.Funds
 }

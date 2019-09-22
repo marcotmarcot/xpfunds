@@ -2,8 +2,10 @@ package xpfunds
 
 import (
 	"io/ioutil"
+	"math"
 	"strconv"
 	"strings"
+	"xpfunds/binarysearch"
 	"xpfunds/check"
 )
 
@@ -15,11 +17,22 @@ type Fund struct {
 
 	// The annualized return in a period, from end (inclusive) to number of
 	// months after end (inclusive). That is, to get the period of months 4
-	// months starting at 1 and ending at 4 is in period[1][3].
-	period [][]float64
+	// months starting at 1 and ending at 4 is in ret[1][3].
+	ret [][]float64
 
-	// The median return in a period stored in the same way as 'period'.
+	// The median return in a period stored in the same way as 'ret'.
 	median [][]float64
+
+	stdDev [][]float64
+}
+
+func NewFund(n string, monthly []float64) *Fund {
+	f := &Fund{
+		Name:    n,
+		monthly: monthly,
+	}
+	f.setFields()
+	return f
 }
 
 func ReadFunds() []*Fund {
@@ -42,42 +55,39 @@ func fundFromLine(line string) *Fund {
 		return nil
 	}
 
-	f := &Fund{}
-	f.Name = fields[0]
-
+	var monthly []float64
 	for i := 5; i < len(fields); i++ {
 		v, err := strconv.ParseFloat(strings.Replace(fields[i], ",", ".", 1), 64)
 		check.Check(err)
-		f.monthly = append(f.monthly, 1.0+v/100.0)
+		monthly = append(monthly, 1.0+v/100.0)
 	}
-	f.setPeriod()
-	f.setMedian()
-	return f
-}
-
-// Return in the Period. end in the inclusive, start is exclusive.
-func (f *Fund) Return(end, start int) float64 {
-	return f.period[end][start-1-end]
-}
-
-// Returns the median return in period, similar to 'Return'.
-func (f *Fund) MedianReturn(end, start int) float64 {
-	return f.median[end][start-1-end]
+	return NewFund(fields[0], monthly)
 }
 
 func (f *Fund) Duration() int {
-	return len(f.period)
+	return len(f.ret)
 }
 
-func (f *Fund) setPeriod() {
-	f.period = make([][]float64, len(f.monthly))
+func (f *Fund) setFields() {
+	f.setRet()
+	f.setMedian()
+	f.setStdDev()
+}
+
+func (f *Fund) setRet() {
+	f.ret = make([][]float64, len(f.monthly))
 	for end, monthly := range f.monthly {
-		f.period[end] = make([]float64, len(f.monthly)-end)
-		f.period[end][0] = monthly
+		f.ret[end] = make([]float64, len(f.monthly)-end)
+		f.ret[end][0] = monthly
 		for diff := 1; diff < len(f.monthly)-end; diff++ {
-			f.period[end][diff] = f.period[end][diff-1] * f.monthly[end+diff]
+			f.ret[end][diff] = f.ret[end][diff-1] * f.monthly[end+diff]
 		}
 	}
+}
+
+// Return in the Period. end in the inclusive, start is exclusive.
+func (f *Fund) Ret(end, start int) float64 {
+	return f.ret[end][start-1-end]
 }
 
 func (f *Fund) setMedian() {
@@ -87,25 +97,55 @@ func (f *Fund) setMedian() {
 		f.median[end][0] = monthly
 		returns := []float64{monthly}
 		for diff := 1; diff < len(f.monthly)-end; diff++ {
-			returns = insert(returns, f.monthly[end+diff])
-			f.median[end][diff] = medianFromSorted(returns)
+			returns = binarysearch.InsertInSorted(returns, f.monthly[end+diff])
+			f.median[end][diff] = binarysearch.MedianFromSorted(returns)
 		}
 	}
+}
+
+// Returns the median return in period, similar to 'Ret'.
+func (f *Fund) medianInPeriod(end, start int) float64 {
+	return f.median[end][start-1-end]
+}
+
+func (f *Fund) setStdDev() {
+	f.stdDev = make([][]float64, len(f.monthly))
+	for end, monthly := range f.monthly {
+		f.stdDev[end] = make([]float64, len(f.monthly)-end)
+		f.stdDev[end][0] = 0
+		total := monthly
+		for diff := 1; diff < len(f.monthly)-end; diff++ {
+			total += f.monthly[end+diff]
+			count := float64(diff + 1)
+			avg := total / count
+			sumDiffs := 0.0
+			for i := end; i <= end+diff; i++ {
+				diff := f.monthly[i] - avg
+				sumDiffs += diff * diff
+			}
+			f.stdDev[end][diff] = math.Sqrt(sumDiffs / count)
+		}
+	}
+}
+
+// Returns the median return in period, similar to 'Ret'.
+func (f *Fund) stdDevInPeriod(end, start int) float64 {
+	return f.stdDev[end][start-1-end]
 }
 
 func NewOptimum(funds []*Fund) *Fund {
 	optimum := &Fund{}
 	duration := maxDuration(funds)
-	optimum.period = make([][]float64, duration)
-	for end := range optimum.period {
-		optimum.period[end] = make([]float64, duration-end)
+	optimum.ret = make([][]float64, duration)
+	for end := range optimum.ret {
+		optimum.ret[end] = make([]float64, duration-end)
 		for diff := 0; diff < duration-end; diff++ {
 			for _, fund := range funds {
 				if end+diff >= fund.Duration() {
 					continue
 				}
-				if fund.period[end][diff] > optimum.period[end][diff] {
-					optimum.period[end][diff] = fund.period[end][diff]
+				if fund.ret[end][diff] > optimum.ret[end][diff] {
+					optimum.ret[end][diff] = fund.ret[end][diff]
 				}
 			}
 		}
@@ -123,27 +163,8 @@ func maxDuration(funds []*Fund) int {
 	return duration
 }
 
-func insert(s []float64, e float64) []float64 {
-	i := binarySearch(s, 0, len(s), e)
-	return append(s[:i], append([]float64{e}, s[i:]...)...)
-}
-
-func binarySearch(s []float64, begin, end int, e float64) int {
-	if end-begin == 0 {
-		return begin
-	}
-	pivot := (begin + end) / 2
-	if s[pivot] == e {
-		return pivot
-	} else if s[pivot] < e {
-		return binarySearch(s, pivot+1, end, e)
-	}
-	return binarySearch(s, begin, pivot, e)
-}
-
-func medianFromSorted(s []float64) float64 {
-	if len(s)%2 == 0 {
-		return s[len(s)/2]
-	}
-	return (s[len(s)/2] + s[len(s)/2+1]) / 2
+var Fields = map[string]func(f *Fund, start, end int) float64{
+	"ret":    (*Fund).Ret,
+	"median": (*Fund).medianInPeriod,
+	"stdDev": (*Fund).stdDevInPeriod,
 }
