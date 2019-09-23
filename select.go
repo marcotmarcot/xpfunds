@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"time"
 	"xpfunds"
 	"xpfunds/simulate"
@@ -11,7 +10,7 @@ import (
 var (
 	funds       []*xpfunds.Fund
 	maxDuration int
-	maxMonths   = 0
+	maxMonths   = 60
 	numFunds    = 10
 )
 
@@ -28,49 +27,49 @@ func main() {
 		start := time.Now()
 		best, perf := bestInRegion(point, step)
 		end := time.Now()
-		fmt.Printf("%v\t%v\t%v\t%v\n", i, best, perf, end.Sub(start).String())
+		fmt.Printf("%v\t%v\t%v\t%v\t%v\n", i, best, perf, end.Sub(start).String(), step)
 		step /= 2
-		if !samePoint(point, best) {
-			point = nextPoint(point, best)
-		}
+		point = nextPoint(point, best)
 	}
 }
 
 func bestInRegion(point []float64, step float64) ([]float64, float64) {
-	return runBestInRegion(nil, point, step, 0)
+	return runBestInRegion(nil, point, step, 2)
 }
 
 func runBestInRegion(picked, toPick []float64, step float64, parallel int) ([]float64, float64) {
 	if len(toPick) == 0 {
 		perf := simulate.MedianPerformance(funds, maxDuration, numFunds, simulate.NewWeighted(maxMonths, picked))
-		fmt.Println(picked, perf)
 		return picked, perf
 	}
-	var bestPicked []float64
+	bestPicked := make([]float64, len(picked)+len(toPick))
 	best := -999999.99
-	i := len(toPick) - 1
 	if parallel > 0 {
 		c := make(chan *result)
-		for d := toPick[i] - step; d <= toPick[i]+step; d += step {
+		for d := toPick[0] - step; d <= toPick[0]+step; d += step {
 			go func(d float64) {
-				picked, perf := runBestInRegion(append(picked, d), toPick[:i], step, parallel-1)
-				c <- &result{picked, perf}
+				subBest, perf := runBestInRegion(append(picked, d), toPick[1:], step, parallel-1)
+				c <- &result{subBest, perf}
 			}(d)
 		}
-		for d := toPick[i] - step; d <= toPick[i]+step; d += step {
+		for d := toPick[0] - step; d <= toPick[0]+step; d += step {
 			r := <-c
 			if r.perf > best {
 				best = r.perf
-				bestPicked = r.picked
+				for i, p := range r.picked {
+					bestPicked[i] = p
+				}
 			}
 		}
 		return bestPicked, best
 	}
-	for d := toPick[i] - step; d <= toPick[i]+step; d += step {
-		picked, perf := runBestInRegion(append(picked, d), toPick[:i], step, parallel-1)
+	for d := toPick[0] - step; d <= toPick[0]+step; d += step {
+		subBest, perf := runBestInRegion(append(picked, d), toPick[1:], step, parallel-1)
 		if perf > best {
 			best = perf
-			bestPicked = picked
+			for i, p := range subBest {
+				bestPicked[i] = p
+			}
 		}
 	}
 	return bestPicked, best
@@ -87,13 +86,4 @@ func nextPoint(orig []float64, best []float64) []float64 {
 		new[i] = (orig[i] + best[i]) / 2
 	}
 	return new
-}
-
-func samePoint(a, b []float64) bool {
-	for i := range a {
-		if math.Abs(a[i]-b[i]) > 0.000001 {
-			return false
-		}
-	}
-	return true
 }
