@@ -1,6 +1,7 @@
 package xpfunds
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math"
 	"strconv"
@@ -10,7 +11,11 @@ import (
 )
 
 type Fund struct {
-	Name string
+	name string
+
+	active string
+
+	min string
 
 	// The monthly return of the fund, starting from the last month.
 	monthly []float64
@@ -22,7 +27,7 @@ type Fund struct {
 
 func NewFund(n string, monthly []float64) *Fund {
 	f := &Fund{
-		Name:    n,
+		name:    n,
 		monthly: monthly,
 		fields:  make(map[string][][]float64),
 		ratio:   make(map[string][][]float64),
@@ -154,7 +159,10 @@ func fundFromLine(line string) *Fund {
 		check.Check(err)
 		monthly = append(monthly, 1.0+v/100.0)
 	}
-	return NewFund(fields[0], monthly)
+	f := NewFund(fields[0], monthly)
+	f.active = fields[4]
+	f.min = fields[1]
+	return f
 }
 
 func (f *Fund) Duration() int {
@@ -178,6 +186,10 @@ func (f *Fund) Weighted(weight map[string]float64, end, start int) float64 {
 		total += f.ratio[field][end][start-1-end] * value
 	}
 	return total
+}
+
+func (f *Fund) Print() string {
+	return fmt.Sprintf("%v\t%v\t%v", f.name, f.active, f.min)
 }
 
 func setRatio(funds []*Fund) {

@@ -11,6 +11,8 @@ var (
 	numFunds      = 10
 	maxMinMonths  = 2
 	stepMinMonths = 1
+	step          = 1.0
+	print         = true
 )
 
 func main() {
@@ -25,14 +27,14 @@ func main() {
 	n := 0
 	for monthsToRead := 0; monthsToRead <= 0; monthsToRead += 1 {
 		for minMonths := 2; minMonths <= 2; minMonths += 1 {
-			for ret := 0.675; ret <= 0.675; ret += 0.025 {
+			for ret := 0.675; ret <= 0.7; ret += step {
 				n++
 				go func(ret float64, monthsToRead, minMonths int) {
-					for median := 0.8; median <= 0.8; median += 0.05 {
-						for stdDev := 0.95; stdDev <= 0.95; stdDev += 0.025 {
-							for nmr := -0.6; nmr <= -0.6; nmr += 0.025 {
-								for gf := -0.4; gf <= -0.4; gf += 0.025 {
-									for gfl := -0.65; gfl <= -0.65; gfl += 0.025 {
+					for median := 0.775; median <= 0.825; median += step {
+						for stdDev := 0.95; stdDev <= 0.975; stdDev += step {
+							for nmr := -0.575; nmr <= -0.575; nmr += step {
+								for gf := -0.425; gf <= -0.375; gf += step {
+									for gfl := -0.625; gfl <= -0.625; gfl += step {
 										weight := map[string]float64{
 											"return":             ret,
 											"median":             median,
@@ -44,9 +46,12 @@ func main() {
 										s := &simulate.Weighted{numFunds, monthsToRead, minMonths, weight}
 										p := simulate.MedianPerformance(funds, maxDuration-maxMinMonths, numFunds, s)
 										fmt.Printf("%v\t%v\n", s.Name(), p)
-										chosen := s.Choose(funds, 0)
-										for _, f := range chosen {
-											fmt.Println(f.Name)
+										if print {
+											s.NumFunds = 20
+											chosen := s.Choose(funds, 0)
+											for _, f := range chosen {
+												fmt.Println(f.Print())
+											}
 										}
 									}
 								}
