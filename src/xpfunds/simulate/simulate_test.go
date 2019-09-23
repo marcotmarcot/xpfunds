@@ -1,96 +1,221 @@
 package simulate
 
 import (
+	"math"
 	"testing"
 	"xpfunds"
 )
 
-func TestFromStartChoose(t *testing.T) {
-	funds := []*xpfunds.Fund{
-		buildFund(1.02),
-		buildFund(1.04),
-		buildFund(1.03),
-		buildFund(1.01),
-	}
-	choice := (&fromStart{1, false}).choose(funds, []int{0, 1, 3}, 0)
-	if want, got := 3, len(choice); want != got {
-		t.Fatalf("want=%v, got=%v", want, got)
-	}
-	if want, got := 1, choice[0]; want != got {
-		t.Errorf("want=%v, got=%v", want, got)
-	}
-	if want, got := 0, choice[1]; want != got {
-		t.Errorf("want=%v, got=%v", want, got)
-	}
-	if want, got := 3, choice[2]; want != got {
-		t.Errorf("want=%v, got=%v", want, got)
+func TestPerformance(t *testing.T) {
+	tests := []struct {
+		name     string
+		monthlys [][]float64
+		numFunds int
+		weight   float64
+		want     float64
+	}{{
+		"clearBest",
+		[][]float64{
+			{1, 1.1},
+			{2, 1.2},
+		},
+		1,
+		1,
+		1,
+	}, {
+		"reverse",
+		[][]float64{
+			{2, 1.1},
+			{1, 1.2},
+		},
+		1,
+		1,
+		0.5,
+	}, {
+		"twoFunds",
+		[][]float64{
+			{3, 1.1},
+			{1, 1.2},
+			{2, 1.3},
+		},
+		2,
+		1,
+		0.5,
+	}, {
+		"clearBestNegative",
+		[][]float64{
+			{1, 1.1},
+			{2, 1.2},
+		},
+		1,
+		-1,
+		0.5,
+	}, {
+		"reverseNegative",
+		[][]float64{
+			{2, 1.1},
+			{1, 1.2},
+		},
+		1,
+		-1,
+		1,
+	}, {
+		"twoFundsNegative",
+		[][]float64{
+			{3, 1.1},
+			{1, 1.2},
+			{2, 1.3},
+		},
+		2,
+		-1,
+		0.6666666666666666,
+	}}
+	for _, test := range tests {
+		var funds []*xpfunds.Fund
+		for _, monthly := range test.monthlys {
+			funds = append(funds, xpfunds.NewFund(monthly))
+		}
+		xpfunds.SetRatio(funds)
+		if perf, ok := performance(funds, test.numFunds, NewWeighted(0, []float64{test.weight, 1, 1}), 1); !ok {
+			t.Errorf("%v: Not ok", test.name)
+		} else if got, want := perf, test.want; !eq(got, want) {
+			t.Errorf("%v: got: %v, want: %v", test.name, got, want)
+		}
 	}
 }
 
-func TestFromStartReverseChoose(t *testing.T) {
-	funds := []*xpfunds.Fund{
-		buildFund(1.02),
-		buildFund(1.04),
-		buildFund(1.03),
-		buildFund(1.01),
-	}
-	choice := (&fromStart{1, true}).choose(funds, []int{0, 1, 3}, 0)
-	if want, got := 3, len(choice); want != got {
-		t.Fatalf("want=%v, got=%v", want, got)
-	}
-	if want, got := 3, choice[0]; want != got {
-		t.Errorf("want=%v, got=%v", want, got)
-	}
-	if want, got := 0, choice[1]; want != got {
-		t.Errorf("want=%v, got=%v", want, got)
-	}
-	if want, got := 1, choice[2]; want != got {
-		t.Errorf("want=%v, got=%v", want, got)
+func TestMedianPerformance(t *testing.T) {
+	tests := []struct {
+		name     string
+		monthlys [][]float64
+		numFunds int
+		weight   float64
+		want     float64
+	}{{
+		"clearBest",
+		[][]float64{
+			{1, 1.1},
+			{2, 1.2},
+		},
+		1,
+		1,
+		1,
+	}, {
+		"reverse",
+		[][]float64{
+			{2, 1.1},
+			{1, 1.2},
+		},
+		1,
+		1,
+		0.5,
+	}, {
+		"twoFunds",
+		[][]float64{
+			{3, 1.1},
+			{1, 1.2},
+			{2, 1.3},
+		},
+		2,
+		1,
+		0.5,
+	}, {
+		"clearBestNegative",
+		[][]float64{
+			{1, 1.1},
+			{2, 1.2},
+		},
+		1,
+		-1,
+		0.5,
+	}, {
+		"reverseNegative",
+		[][]float64{
+			{2, 1.1},
+			{1, 1.2},
+		},
+		1,
+		-1,
+		1,
+	}, {
+		"twoFundsNegative",
+		[][]float64{
+			{3, 1.1},
+			{1, 1.2},
+			{2, 1.3},
+		},
+		2,
+		-1,
+		0.6666666666666666,
+	}, {
+		"3clearBest",
+		[][]float64{
+			{1, 1, 1.1},
+			{1.5, 2, 1.2},
+		},
+		1,
+		1,
+		1,
+	}, {
+		"3reverse",
+		[][]float64{
+			{1.5, 2, 1.1},
+			{1, 1, 1.2},
+		},
+		1,
+		1,
+		0.6666666666666663,
+	}, {
+		"3twoFunds",
+		[][]float64{
+			{2.5, 3, 1.1},
+			{1, 1, 1.2},
+			{2, 2, 1.3},
+		},
+		2,
+		1,
+		0.6166666666666667,
+	}, {
+		"3clearBestNegative",
+		[][]float64{
+			{1, 1, 1.1},
+			{1.5, 2, 1.2},
+		},
+		1,
+		-1,
+		0.5,
+	}, {
+		"3reverseNegative",
+		[][]float64{
+			{1.5, 2, 1.1},
+			{1, 1, 1.2},
+		},
+		1,
+		-1,
+		0.8333333333333333,
+	}, {
+		"3twoFundsNegative",
+		[][]float64{
+			{2.5, 3, 1.1},
+			{1, 1, 1.2},
+			{2, 2, 1.3},
+		},
+		2,
+		-1,
+		0.5833333333333333,
+	}}
+	for _, test := range tests {
+		var funds []*xpfunds.Fund
+		for _, monthly := range test.monthlys {
+			funds = append(funds, xpfunds.NewFund(monthly))
+		}
+		xpfunds.SetRatio(funds)
+		if got, want := MedianPerformance(funds, 3, test.numFunds, NewWeighted(0, []float64{test.weight, 1, 1})), test.want; !eq(got, want) {
+			t.Errorf("%v: got: %v, want: %v", test.name, got, want)
+		}
 	}
 }
 
-func buildFund(monthly float64) *xpfunds.Fund {
-	return &xpfunds.Fund{
-		Period: [][]float64{{monthly}},
-	}
+func eq(a, b float64) bool {
+	return math.Abs(a-b) < 0.000001
 }
-
-// func TestBestChooseEqual(t *testing.T) {
-// 	funds = []*fund{
-// 		{[][]float64{{1}}},
-// 		{[][]float64{{1}}}}
-// 	choice := best{}.choose(2, 0, 0, 0)
-// 	if want, got := 2, len(choice); want != got {
-// 		t.Fatalf("want=%v, got=%v", want, got)
-// 	}
-// 	if want, got := 0, choice[0]; want != got {
-// 		t.Errorf("want=%v, got=%v", want, got)
-// 	}
-// 	if want, got := 1, choice[1]; want != got {
-// 		t.Errorf("want=%v, got=%v", want, got)
-// 	}
-// }
-
-// func TestRentability(t *testing.T) {
-// 	r := fund{[][]float64{{1}, {1, 1}}}.rentability(1, 1)
-// 	if r == nil {
-// 		t.Fatalf("r == nil")
-// 	}
-// 	if want, got := 1.0, *r; want != got {
-// 		t.Errorf("want=%v, got=%v", want, got)
-// 	}
-// }
-
-// func TestLossBest(t *testing.T) {
-// 	funds = []*fund{
-// 		{[][]float64{{1}, {1, 1}}},
-// 		{[][]float64{{1}, {1, 2}}}}
-// 	optimum = &fund{[][]float64{{1}, {1, 2}}}
-// 	l := loss(best{}, 2, 0, 0, 1, 0)
-// 	if l == nil {
-// 		t.Fatalf("l == nil")
-// 	}
-// 	if want, got := 0.75, *l; want != got {
-// 		t.Errorf("want=%v, got=%v", want, got)
-// 	}
-// }

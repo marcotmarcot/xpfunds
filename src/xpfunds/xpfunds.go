@@ -8,6 +8,7 @@ import (
 	"strings"
 	"xpfunds/binarysearch"
 	"xpfunds/check"
+	"xpfunds/median"
 )
 
 type Fund struct {
@@ -20,23 +21,27 @@ type Fund struct {
 	// The monthly return of the fund, starting from the last month.
 	monthly []float64
 
-	fields map[string][][]float64
+	// The position of the first slice determines the dimension. The position of
+	// the second slice indicates an end time of a period and the third position
+	// the difference from the start time to the end time of a period. Arbitrary
+	// range.
+	features [][][]float64
 
-	ratio map[string][][]float64
+	// Same as fieldValues, but holds the ratio of the value in this fund to the
+	// value in the fund with the highest value of this field. Range: 0-1.
+	ratio [][][]float64
 }
 
-func NewFund(n string, monthly []float64) *Fund {
+func NewFund(monthly []float64) *Fund {
 	f := &Fund{
-		name:    n,
 		monthly: monthly,
-		fields:  make(map[string][][]float64),
-		ratio:   make(map[string][][]float64),
 	}
-	f.setFields()
+	f.setFeatures()
+	f.makeRatio()
 	return f
 }
 
-func (f *Fund) setFields() {
+func (f *Fund) setFeatures() {
 	f.setReturn()
 	f.setMedian()
 	f.setStdDev()
@@ -45,34 +50,36 @@ func (f *Fund) setFields() {
 }
 
 func (f *Fund) setReturn() {
-	f.fields["return"] = make([][]float64, len(f.monthly))
+	ret := make([][]float64, len(f.monthly))
 	for end, monthly := range f.monthly {
-		f.fields["return"][end] = make([]float64, len(f.monthly)-end)
-		f.fields["return"][end][0] = monthly
+		ret[end] = make([]float64, len(f.monthly)-end)
+		ret[end][0] = monthly
 		for diff := 1; diff < len(f.monthly)-end; diff++ {
-			f.fields["return"][end][diff] = f.fields["return"][end][diff-1] * f.monthly[end+diff]
+			ret[end][diff] = ret[end][diff-1] * f.monthly[end+diff]
 		}
 	}
+	f.features = append(f.features, ret)
 }
 
 func (f *Fund) setMedian() {
-	f.fields["median"] = make([][]float64, len(f.monthly))
+	med := make([][]float64, len(f.monthly))
 	for end, monthly := range f.monthly {
-		f.fields["median"][end] = make([]float64, len(f.monthly)-end)
-		f.fields["median"][end][0] = monthly
+		med[end] = make([]float64, len(f.monthly)-end)
+		med[end][0] = monthly
 		returns := []float64{monthly}
 		for diff := 1; diff < len(f.monthly)-end; diff++ {
 			returns = binarysearch.InsertInSorted(returns, f.monthly[end+diff])
-			f.fields["median"][end][diff] = binarysearch.MedianFromSorted(returns)
+			med[end][diff] = median.MedianFromSorted(returns)
 		}
 	}
+	f.features = append(f.features, med)
 }
 
 func (f *Fund) setStdDev() {
-	f.fields["stdDev"] = make([][]float64, len(f.monthly))
+	stdDev := make([][]float64, len(f.monthly))
 	for end, monthly := range f.monthly {
-		f.fields["stdDev"][end] = make([]float64, len(f.monthly)-end)
-		f.fields["stdDev"][end][0] = 0
+		stdDev[end] = make([]float64, len(f.monthly)-end)
+		stdDev[end][0] = 0
 		total := monthly
 		for diff := 1; diff < len(f.monthly)-end; diff++ {
 			total += f.monthly[end+diff]
@@ -83,15 +90,16 @@ func (f *Fund) setStdDev() {
 				diff := f.monthly[i] - avg
 				sumDiffs += diff * diff
 			}
-			f.fields["stdDev"][end][diff] = math.Sqrt(sumDiffs / count)
+			stdDev[end][diff] = math.Sqrt(sumDiffs / count)
 		}
 	}
+	f.features = append(f.features, stdDev)
 }
 
 func (f *Fund) setNegativeMonthRatio() {
-	f.fields["negativeMonthRatio"] = make([][]float64, len(f.monthly))
+	nmr := make([][]float64, len(f.monthly))
 	for end := range f.monthly {
-		f.fields["negativeMonthRatio"][end] = make([]float64, len(f.monthly)-end)
+		nmr[end] = make([]float64, len(f.monthly)-end)
 		negative := 0
 		nonNegative := 0
 		for diff := 0; diff < len(f.monthly)-end; diff++ {
@@ -100,17 +108,18 @@ func (f *Fund) setNegativeMonthRatio() {
 			} else {
 				nonNegative++
 			}
-			f.fields["negativeMonthRatio"][end][diff] = float64(negative) / float64(negative+nonNegative)
+			nmr[end][diff] = float64(negative) / float64(negative+nonNegative)
 		}
 	}
+	f.features = append(f.features, nmr)
 }
 
 func (f *Fund) setGreatestFall() {
-	f.fields["greatestFall"] = make([][]float64, len(f.monthly))
-	f.fields["greatestFallLen"] = make([][]float64, len(f.monthly))
+	gf := make([][]float64, len(f.monthly))
+	gfl := make([][]float64, len(f.monthly))
 	for end := range f.monthly {
-		f.fields["greatestFall"][end] = make([]float64, len(f.monthly)-end)
-		f.fields["greatestFallLen"][end] = make([]float64, len(f.monthly)-end)
+		gf[end] = make([]float64, len(f.monthly)-end)
+		gfl[end] = make([]float64, len(f.monthly)-end)
 		greatestFall := 1.0
 		greatestFallLen := 0
 		curr := 1.0
@@ -126,8 +135,19 @@ func (f *Fund) setGreatestFall() {
 				greatestFall = curr
 				greatestFallLen = currLen
 			}
-			f.fields["greatestFall"][end][diff] = greatestFall
-			f.fields["greatestFallLen"][end][diff] = float64(greatestFallLen)
+			gf[end][diff] = greatestFall
+			gfl[end][diff] = float64(greatestFallLen)
+		}
+	}
+	f.features = append(f.features, gf, gfl)
+}
+
+func (f *Fund) makeRatio() {
+	f.ratio = make([][][]float64, f.FeatureCount())
+	for feature := range f.ratio {
+		f.ratio[feature] = make([][]float64, f.Duration())
+		for end := range f.ratio[feature] {
+			f.ratio[feature][end] = make([]float64, f.Duration()-end)
 		}
 	}
 }
@@ -143,7 +163,7 @@ func ReadFunds() []*Fund {
 		}
 		funds = append(funds, f)
 	}
-	setRatio(funds)
+	SetRatio(funds)
 	return funds
 }
 
@@ -159,78 +179,68 @@ func fundFromLine(line string) *Fund {
 		check.Check(err)
 		monthly = append(monthly, 1.0+v/100.0)
 	}
-	f := NewFund(fields[0], monthly)
+	f := NewFund(monthly)
+	f.name = fields[0]
 	f.active = fields[4]
 	f.min = fields[1]
 	return f
 }
 
-func (f *Fund) Duration() int {
-	return len(f.fields["return"])
+func (f *Fund) FeatureCount() int {
+	return len(f.features)
 }
 
-func (f *Fund) Fields() []string {
-	fields := make([]string, len(f.fields))
-	i := 0
-	for field := range f.fields {
-		fields[i] = field
-		i++
-	}
-	return fields
+func (f *Fund) Duration() int {
+	return len(f.monthly)
 }
 
 // End is inclusive, start is exclusive
-func (f *Fund) Weighted(weight map[string]float64, end, start int) float64 {
+func (f *Fund) Weighted(weight []float64, end, start int) float64 {
 	total := 0.0
-	for field, value := range weight {
-		total += f.ratio[field][end][start-1-end] * value
+	for i, w := range weight {
+		total += f.ratio[i][end][start-1-end] * w
 	}
 	return total
+}
+
+func (f *Fund) Return(end, start int) float64 {
+	return f.Weighted([]float64{1}, end, start)
 }
 
 func (f *Fund) Print() string {
 	return fmt.Sprintf("%v\t%v\t%v", f.name, f.active, f.min)
 }
 
-func setRatio(funds []*Fund) {
-	optimum := &Fund{fields: make(map[string][][]float64)}
-	duration := maxDuration(funds)
-	for _, field := range funds[0].Fields() {
-		optimum.fields[field] = make([][]float64, duration)
-		for _, f := range funds {
-			f.ratio[field] = make([][]float64, duration)
-		}
-		for end := range optimum.fields[field] {
-			optimum.fields[field][end] = make([]float64, duration-end)
-			for _, f := range funds {
-				f.ratio[field][end] = make([]float64, duration-end)
-			}
+func SetRatio(funds []*Fund) {
+	duration := MaxDuration(funds)
+	for feature := 0; feature < funds[0].FeatureCount(); feature++ {
+		for end := range funds[0].features[feature] {
 			for diff := 0; diff < duration-end; diff++ {
-				optimum.fields[field][end][diff] = -999999.99
-				for _, fund := range funds {
-					if end+diff >= fund.Duration() {
+				highest := -999999.99
+				for _, f := range funds {
+					if f.Duration() <= end+diff {
 						continue
 					}
-					if fund.fields[field][end][diff] > optimum.fields[field][end][diff] {
-						optimum.fields[field][end][diff] = fund.fields[field][end][diff]
+					if f.features[feature][end][diff] > highest {
+						highest = f.features[feature][end][diff]
 					}
 				}
 				for _, f := range funds {
 					if f.Duration() <= end+diff {
 						continue
 					}
-					if optimum.fields[field][end][diff] == 0 {
-						f.ratio[field][end][diff] = 1
+					if highest == 0 {
+						f.ratio[feature][end][diff] = 1
 						continue
 					}
-					f.ratio[field][end][diff] = f.fields[field][end][diff] / optimum.fields[field][end][diff]
+					f.ratio[feature][end][diff] = f.features[feature][end][diff] / highest
 				}
 			}
 		}
 	}
 }
 
-func maxDuration(funds []*Fund) int {
+func MaxDuration(funds []*Fund) int {
 	duration := 0
 	for _, f := range funds {
 		if f.Duration() > duration {

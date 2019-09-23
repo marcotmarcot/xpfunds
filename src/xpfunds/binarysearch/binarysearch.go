@@ -21,10 +21,3 @@ func upperBound(s []float64, begin, end int, e float64) int {
 	}
 	return upperBound(s, begin, pivot, e)
 }
-
-func MedianFromSorted(s []float64) float64 {
-	if len(s)%2 == 1 {
-		return s[len(s)/2]
-	}
-	return (s[len(s)/2] + s[len(s)/2-1]) / 2
-}

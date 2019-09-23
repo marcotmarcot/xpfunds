@@ -35,20 +35,21 @@ func main() {
 							for nmr := -0.575; nmr <= -0.575; nmr += step {
 								for gf := -0.425; gf <= -0.375; gf += step {
 									for gfl := -0.625; gfl <= -0.625; gfl += step {
-										weight := map[string]float64{
-											"return":             ret,
-											"median":             median,
-											"stdDev":             stdDev,
-											"negativeMonthRatio": nmr,
-											"greatestFall":       gf,
-											"greatestFallLen":    gfl,
+										weight := []float64{
+											ret,
+											median,
+											stdDev,
+											nmr,
+											gf,
+											gfl,
+											-1,
+											1,
 										}
-										s := &simulate.Weighted{numFunds, monthsToRead, minMonths, weight}
+										s := simulate.NewWeighted(maxMinMonths, weight)
 										p := simulate.MedianPerformance(funds, maxDuration-maxMinMonths, numFunds, s)
 										fmt.Printf("%v\t%v\n", s.Name(), p)
 										if print {
-											s.NumFunds = 20
-											chosen := s.Choose(funds, 0)
+											chosen := s.Choose(funds, 20, 0)
 											for _, f := range chosen {
 												fmt.Println(f.Print())
 											}
