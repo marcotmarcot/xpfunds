@@ -214,7 +214,7 @@ func (f *Fund) Print() string {
 func SetRatio(funds []*Fund) {
 	duration := MaxDuration(funds)
 	for feature := 0; feature < funds[0].FeatureCount(); feature++ {
-		for end := range funds[0].features[feature] {
+		for end := 0; end < duration; end++ {
 			for diff := 0; diff < duration-end; diff++ {
 				highest := -999999.99
 				for _, f := range funds {
