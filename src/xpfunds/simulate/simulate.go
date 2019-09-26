@@ -2,7 +2,6 @@ package simulate
 
 import (
 	"fmt"
-	"log"
 	"xpfunds"
 	"xpfunds/median"
 )
@@ -82,9 +81,6 @@ func (w *Weighted) Choose(funds []*xpfunds.Fund, end int) []*xpfunds.Fund {
 				bestValue = value
 				bestFund = f
 			}
-		}
-		if bestFund == nil {
-			log.Fatal("bestFund == nil")
 		}
 		chosen[bestFund] = true
 	}
