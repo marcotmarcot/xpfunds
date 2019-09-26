@@ -22,6 +22,7 @@ func main() {
 		}
 	}
 	point := make([]float64, (funds[0].FeatureCount()+(&simulate.Weighted{}).FeatureCount())*numFunds)
+	fmt.Println(point, simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, point)))
 	step := 1.0
 	for i := 0; true; i++ {
 		start := time.Now()
