@@ -11,8 +11,8 @@ import (
 var (
 	funds       []*xpfunds.Fund
 	maxDuration int
-	maxMonths   = 3
-	numFunds    = 10
+	maxMonths   = 60
+	numFunds    = 1
 )
 
 func main() {
@@ -41,31 +41,17 @@ func bestInRegion(point []float64) ([]float64, float64) {
 	}
 	bestPerf := simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, newPoint))
 	for i := 0; i < len(newPoint); i++ {
-		left := 0.0
-		leftStep := rand.NormFloat64()
-		if newPoint[i]-leftStep >= -1 {
-			newPoint[i] -= leftStep
-			left = simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, newPoint))
-			newPoint[i] += leftStep
-		}
-		right := 0.0
-		rightStep := rand.NormFloat64()
-		if newPoint[i]+rightStep <= 1 {
-			newPoint[i] += rightStep
-			right = simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, newPoint))
-			newPoint[i] -= rightStep
-		}
-		// No change.
-		if bestPerf > left && bestPerf > right {
+		step := rand.NormFloat64()
+		if newPoint[i]+step <= -1 || newPoint[i]+step >= 1 {
 			continue
 		}
-		if left > right {
-			newPoint[i] -= leftStep
-			bestPerf = left
+		newPoint[i] += step
+		perf := simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, newPoint))
+		if perf > bestPerf {
+			bestPerf = perf
 			continue
 		}
-		newPoint[i] += rightStep
-		bestPerf = right
+		newPoint[i] -= step
 	}
 	return newPoint, bestPerf
 }
