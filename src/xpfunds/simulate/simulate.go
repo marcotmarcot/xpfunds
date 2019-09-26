@@ -2,6 +2,7 @@ package simulate
 
 import (
 	"fmt"
+	"log"
 	"xpfunds"
 	"xpfunds/median"
 )
@@ -82,9 +83,18 @@ func (w *Weighted) Choose(funds []*xpfunds.Fund, end int) []*xpfunds.Fund {
 				bestFund = f
 			}
 		}
+		if bestFund == nil {
+			break
+		}
 		chosen[bestFund] = true
 	}
-	ret := make([]*xpfunds.Fund, numFunds)
+	if len(chosen) == 0 {
+		for _, f := range funds {
+			log.Print(f.Duration() - end)
+		}
+		log.Fatal("len(funds)=", len(funds), " w=", w.Name())
+	}
+	ret := make([]*xpfunds.Fund, len(chosen))
 	i := 0
 	for f := range chosen {
 		ret[i] = f
