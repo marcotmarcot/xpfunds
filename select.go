@@ -22,13 +22,12 @@ func main() {
 		}
 	}
 	point := make([]float64, (funds[0].FeatureCount()+(&simulate.Weighted{}).FeatureCount())*numFunds)
-	fmt.Println(point, simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, point)))
 	step := 1.0
 	for i := 0; true; i++ {
 		start := time.Now()
 		best, perf := bestInRegion(point, step)
 		end := time.Now()
-		fmt.Printf("%v\t%v\t%v\t%v\t%v\n", i, best, perf, end.Sub(start).String(), step)
+		fmt.Printf("%v\t%v\t%v\t%v\t%v\n", i, perf, end.Sub(start).String(), best, step)
 		point = nextPoint(point, best)
 		step /= 2
 	}
