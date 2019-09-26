@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 	"xpfunds"
 	"xpfunds/simulate"
@@ -23,29 +24,26 @@ func main() {
 	}
 	point := make([]float64, (funds[0].FeatureCount()+(&simulate.Weighted{}).FeatureCount())*numFunds)
 	step := 1.0
-	bestPerf := 0.0
 	for i := 0; true; i++ {
 		start := time.Now()
 		best, perf := bestInRegion(point, step)
-		if perf-bestPerf > 0.000001 {
-			bestPerf = perf
-			point = nextPoint(point, best)
-		} else {
-			best = point
-		}
 		end := time.Now()
 		fmt.Printf("%v\t%v\t%v\t%v\t%v\n", i, best, perf, end.Sub(start).String(), step)
+		point = nextPoint(point, best)
 		step /= 2
 	}
 }
 
 func bestInRegion(point []float64, step float64) ([]float64, float64) {
-	return runBestInRegion(nil, point, step, 2)
+	return runBestInRegion(nil, point, step, 0)
 }
 
 func runBestInRegion(picked, toPick []float64, step float64, parallel int) ([]float64, float64) {
 	if len(toPick) == 0 {
 		perf := simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, picked))
+		if reflect.DeepEqual(picked, []float64{-0.5, 1, -0.25, 1}) {
+			fmt.Println(perf)
+		}
 		return picked, perf
 	}
 	bestPicked := make([]float64, len(picked)+len(toPick))
