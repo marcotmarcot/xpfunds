@@ -77,7 +77,7 @@ func (w *Weighted) Choose(funds []*xpfunds.Fund, end int) []*xpfunds.Fund {
 			if w.monthsToRead == 0 {
 				start = f.Duration()
 			}
-			value := f.Weighted(w.weight[i*featureCount:(i+1)*featureCount], end, start)
+			value := f.Weighted(w.weight[0:featureCount], end, start)
 			if value > bestValue {
 				bestValue = value
 				bestFund = f

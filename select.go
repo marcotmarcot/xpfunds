@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 	"xpfunds"
 	"xpfunds/simulate"
@@ -11,8 +10,8 @@ import (
 var (
 	funds       []*xpfunds.Fund
 	maxDuration int
-	maxMonths   = 6
-	numFunds    = 3
+	maxMonths   = 3
+	numFunds    = 10
 )
 
 func main() {
@@ -35,53 +34,30 @@ func main() {
 }
 
 func bestInRegion(point []float64, step float64) ([]float64, float64) {
-	return runBestInRegion(nil, point, step, 2)
-}
-
-func runBestInRegion(picked, toPick []float64, step float64, parallel int) ([]float64, float64) {
-	if len(toPick) == 0 {
-		perf := simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, picked))
-		if reflect.DeepEqual(picked, []float64{-0.5, 1, -0.25, 1}) {
-			fmt.Println(perf)
-		}
-		return picked, perf
+	newPoint := make([]float64, len(point))
+	for i, p := range point {
+		newPoint[i] = p
 	}
-	bestPicked := make([]float64, len(picked)+len(toPick))
-	best := -999999.99
-	if parallel > 0 {
-		c := make(chan *result)
-		for d := toPick[0] - step; d <= toPick[0]+step; d += step {
-			go func(d float64) {
-				subBest, perf := runBestInRegion(append(picked, d), toPick[1:], step, parallel-1)
-				c <- &result{subBest, perf}
-			}(d)
+	bestPerf := simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, newPoint))
+	for i := 0; i < len(newPoint); i++ {
+		newPoint[i] -= step
+		left := simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, newPoint))
+		newPoint[i] += step * 2
+		right := simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, newPoint))
+		// No change.
+		if bestPerf > left && bestPerf > right {
+			newPoint[i] -= step
+			continue
 		}
-		for d := toPick[0] - step; d <= toPick[0]+step; d += step {
-			r := <-c
-			if r.perf > best {
-				best = r.perf
-				for i, p := range r.picked {
-					bestPicked[i] = p
-				}
-			}
+		if right >= left {
+			bestPerf = right
+			// NewPoint is already at right.
+			continue
 		}
-		return bestPicked, best
+		bestPerf = left
+		newPoint[i] -= step * 2
 	}
-	for d := toPick[0] - step; d <= toPick[0]+step; d += step {
-		subBest, perf := runBestInRegion(append(picked, d), toPick[1:], step, parallel-1)
-		if perf > best {
-			best = perf
-			for i, p := range subBest {
-				bestPicked[i] = p
-			}
-		}
-	}
-	return bestPicked, best
-}
-
-type result struct {
-	picked []float64
-	perf   float64
+	return newPoint, bestPerf
 }
 
 func nextPoint(orig []float64, best []float64) []float64 {
