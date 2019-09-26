@@ -12,7 +12,7 @@ var (
 	funds       []*xpfunds.Fund
 	maxDuration int
 	maxMonths   = 6
-	numFunds    = 10
+	numFunds    = 2
 )
 
 func main() {
@@ -35,7 +35,7 @@ func main() {
 }
 
 func bestInRegion(point []float64, step float64) ([]float64, float64) {
-	return runBestInRegion(nil, point, step, 0)
+	return runBestInRegion(nil, point, step, 2)
 }
 
 func runBestInRegion(picked, toPick []float64, step float64, parallel int) ([]float64, float64) {
