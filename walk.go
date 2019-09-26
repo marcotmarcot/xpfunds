@@ -27,7 +27,6 @@ func main() {
 	for i := range point {
 		point[i] = rand.Float64()*2 - 1
 	}
-	point = []float64{-0.125, -0.75, 0.875, -0.5, -0.625, -0.25, -1, -0.75}
 	step := 1.0
 	for i := 0; true; i++ {
 		start := time.Now()

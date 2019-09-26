@@ -42,11 +42,11 @@ func NewFund(monthly []float64) *Fund {
 }
 
 func (f *Fund) setFeatures() {
+	f.setReturn()
 	f.setStdDev()
 	f.setNegativeMonthRatio()
 	f.setMedian()
 	f.setGreatestFall()
-	f.setReturn()
 }
 
 func (f *Fund) setReturn() {
@@ -204,9 +204,7 @@ func (f *Fund) Weighted(weight []float64, end, start int) float64 {
 }
 
 func (f *Fund) Return(end, start int) float64 {
-	point := make([]float64, f.FeatureCount())
-	point[len(point)-1] = 1
-	return f.Weighted(point, end, start)
+	return f.Weighted([]float64{1}, end, start)
 }
 
 func (f *Fund) Print() string {
