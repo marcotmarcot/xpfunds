@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 	"xpfunds"
 	"xpfunds/simulate"
@@ -12,10 +13,10 @@ var (
 	maxDuration int
 	maxMonths   = 3
 	numFunds    = 1
-	step        = 0.125
 )
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	funds = xpfunds.ReadFunds()
 	for _, f := range funds {
 		if f.Duration() > maxDuration {
@@ -41,27 +42,29 @@ func bestInRegion(point []float64) ([]float64, float64) {
 	bestPerf := simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, newPoint))
 	for i := 0; i < len(newPoint); i++ {
 		left := 0.0
-		if newPoint[i]-step >= -1 {
-			newPoint[i] -= step
+		leftStep := rand.NormFloat64()
+		if newPoint[i]-leftStep >= -1 {
+			newPoint[i] -= leftStep
 			left = simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, newPoint))
-			newPoint[i] += step
+			newPoint[i] += leftStep
 		}
 		right := 0.0
-		if newPoint[i]+step <= 1 {
-			newPoint[i] += step
+		rightStep := rand.NormFloat64()
+		if newPoint[i]+rightStep <= 1 {
+			newPoint[i] += rightStep
 			right = simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, newPoint))
-			newPoint[i] -= step
+			newPoint[i] -= rightStep
 		}
 		// No change.
 		if bestPerf > left && bestPerf > right {
 			continue
 		}
 		if left > right {
-			newPoint[i] -= step
+			newPoint[i] -= leftStep
 			bestPerf = left
 			continue
 		}
-		newPoint[i] += step
+		newPoint[i] += rightStep
 		bestPerf = right
 	}
 	return newPoint, bestPerf
