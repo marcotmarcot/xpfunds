@@ -45,11 +45,11 @@ func bestInRegion(point []float64, step float64) ([]float64, float64) {
 		newPoint[i] += step * 2
 		right := simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, newPoint))
 		// No change.
-		if bestPerf > left && bestPerf > right {
+		if gt(bestPerf, left) && gt(bestPerf, right) {
 			newPoint[i] -= step
 			continue
 		}
-		if right >= left {
+		if gt(right, left) {
 			bestPerf = right
 			// NewPoint is already at right.
 			continue
@@ -66,4 +66,8 @@ func nextPoint(orig []float64, best []float64) []float64 {
 		new[i] = (orig[i] + best[i]) / 2
 	}
 	return new
+}
+
+func gt(a, b float64) bool {
+	return a-b > 0.000000001
 }
