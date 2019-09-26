@@ -65,12 +65,12 @@ func (w *Weighted) Name() string {
 func (w *Weighted) Choose(funds []*xpfunds.Fund, end int) []*xpfunds.Fund {
 	featureCount := funds[0].FeatureCount()
 	numFunds := len(w.weight) / featureCount
-	chosen := make([]*xpfunds.Fund, numFunds)
+	chosen := make(map[*xpfunds.Fund]bool)
 	for i := 0; i < numFunds; i++ {
 		var bestFund *xpfunds.Fund
 		bestValue := -999999.99
 		for _, f := range funds {
-			if f.Duration()-end < w.monthsToRead+w.ignoreWithoutMonths {
+			if chosen[f] || f.Duration()-end < w.monthsToRead+w.ignoreWithoutMonths {
 				continue
 			}
 			start := end + w.monthsToRead
@@ -86,9 +86,15 @@ func (w *Weighted) Choose(funds []*xpfunds.Fund, end int) []*xpfunds.Fund {
 		if bestFund == nil {
 			log.Fatal("bestFund == nil")
 		}
-		chosen[i] = bestFund
+		chosen[bestFund] = true
 	}
-	return chosen
+	ret := make([]*xpfunds.Fund, numFunds)
+	i := 0
+	for f := range chosen {
+		ret[i] = f
+		i++
+	}
+	return ret
 }
 
 func (w *Weighted) FeatureCount() int {
