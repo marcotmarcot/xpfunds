@@ -12,7 +12,7 @@ var (
 	funds       []*xpfunds.Fund
 	maxDuration int
 	maxMonths   = 6
-	numFunds    = 2
+	numFunds    = 10
 )
 
 func main() {
