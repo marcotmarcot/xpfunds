@@ -24,6 +24,10 @@ func main() {
 		}
 	}
 	point := make([]float64, (funds[0].FeatureCount()+(&simulate.Weighted{}).FeatureCount())*numFunds)
+	for i := range point {
+		point[i] = rand.Float64()*2 - 1
+	}
+	point = []float64{-0.125, -0.75, 0.875, -0.5, -0.625, -0.25, -1, -0.75}
 	step := 1.0
 	for i := 0; true; i++ {
 		start := time.Now()
@@ -41,7 +45,7 @@ func bestInRegion(point []float64) ([]float64, float64) {
 	}
 	bestPerf := simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, newPoint))
 	for i := 0; i < len(newPoint); i++ {
-		step := rand.NormFloat64()
+		step := rand.Float64()*2 - 1
 		if newPoint[i]+step <= -1 || newPoint[i]+step >= 1 {
 			continue
 		}
