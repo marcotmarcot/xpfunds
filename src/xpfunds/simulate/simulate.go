@@ -3,9 +3,7 @@ package simulate
 import (
 	"fmt"
 	"log"
-	"math"
 	"xpfunds"
-	"xpfunds/largestn"
 	"xpfunds/median"
 )
 
@@ -47,50 +45,51 @@ type Strategy interface {
 }
 
 type Weighted struct {
-	numFunds            int
 	monthsToRead        int
 	ignoreWithoutMonths int
 	weight              []float64
 }
 
-func NewWeighted(numFunds, maxMonths int, weight []float64) *Weighted {
+func NewWeighted(maxMonths int, weight []float64) *Weighted {
 	return &Weighted{
-		numFunds,
-		int(math.Round((weight[len(weight)-2] + 1) / 2 * float64(maxMonths))),
-		int(math.Round((weight[len(weight)-1] + 1) / 2 * float64(maxMonths))),
-		weight[:len(weight)-2],
+		0,      // int(math.Round((weight[len(weight)-2] + 1) / 2 * float64(maxMonths))),
+		6,      // int(math.Round((weight[len(weight)-1] + 1) / 2 * float64(maxMonths))),
+		weight, // weight[:len(weight)-2],
 	}
 }
 
 func (w *Weighted) Name() string {
-	return fmt.Sprintf("Weighted(%v,%v,%v,%v)", w.numFunds, w.monthsToRead, w.ignoreWithoutMonths, w.weight)
+	return fmt.Sprintf("Weighted(%v,%v,%v)", w.monthsToRead, w.ignoreWithoutMonths, w.weight)
 }
 
 func (w *Weighted) Choose(funds []*xpfunds.Fund, end int) []*xpfunds.Fund {
-	l := largestn.NewLargestN(w.numFunds)
-	for i, f := range funds {
-		if f.Duration()-end < w.monthsToRead+w.ignoreWithoutMonths {
-			continue
-		}
-		start := end + w.monthsToRead
-		if w.monthsToRead == 0 {
-			start = f.Duration()
-		}
-		l.Add(i, f.Weighted(w.weight, end, start))
-	}
-	chosen := make([]*xpfunds.Fund, len(l.Indexes))
-	for i, index := range l.Indexes {
-		chosen[i] = funds[index]
-	}
-	if len(chosen) == 0 {
+	numFunds := len(w.weight) / (funds[0].FeatureCount() + w.FeatureCount())
+	chosen := make([]*xpfunds.Fund, numFunds)
+	for i := 0; i < numFunds; i++ {
+		var bestFund *xpfunds.Fund
+		bestValue := -999999.99
 		for _, f := range funds {
-			fmt.Println(f.Duration() - end)
+			if f.Duration()-end < w.monthsToRead+w.ignoreWithoutMonths {
+				continue
+			}
+			start := end + w.monthsToRead
+			if w.monthsToRead == 0 {
+				start = f.Duration()
+			}
+			value := f.Weighted(w.weight[i*numFunds:(i+1)*numFunds], end, start)
+			if value > bestValue {
+				bestValue = value
+				bestFund = f
+			}
 		}
-		log.Fatal("len(funds)=", len(funds), " w=", w.Name())
+		if bestFund == nil {
+			log.Fatal("bestFund == nil")
+		}
+		chosen[i] = bestFund
 	}
 	return chosen
 }
 
 func (w *Weighted) FeatureCount() int {
-	return 2
+	return 0
 }

@@ -11,7 +11,7 @@ var (
 	funds       []*xpfunds.Fund
 	maxDuration int
 	maxMonths   = 6
-	numFunds    = 10
+	numFunds    = 2
 )
 
 func main() {
@@ -21,7 +21,7 @@ func main() {
 			maxDuration = f.Duration()
 		}
 	}
-	point := make([]float64, funds[0].FeatureCount()+(&simulate.Weighted{}).FeatureCount())
+	point := make([]float64, (funds[0].FeatureCount()+(&simulate.Weighted{}).FeatureCount())*numFunds)
 	step := 1.0
 	bestPerf := 0.0
 	for i := 0; true; i++ {
@@ -45,7 +45,7 @@ func bestInRegion(point []float64, step float64) ([]float64, float64) {
 
 func runBestInRegion(picked, toPick []float64, step float64, parallel int) ([]float64, float64) {
 	if len(toPick) == 0 {
-		perf := simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(numFunds, maxMonths, picked))
+		perf := simulate.MedianPerformance(funds, maxDuration, maxMonths*2, numFunds, simulate.NewWeighted(maxMonths, picked))
 		return picked, perf
 	}
 	bestPicked := make([]float64, len(picked)+len(toPick))
