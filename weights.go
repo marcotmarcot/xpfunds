@@ -45,11 +45,11 @@ func main() {
 											-1,
 											-0.78125,
 										}
-										s := simulate.NewWeighted(60, weight)
-										p := simulate.MedianPerformance(funds, maxDuration, numFunds, s)
+										s := simulate.NewWeighted(numFunds, maxMinMonths, weight)
+										p := simulate.MedianPerformance(funds, maxDuration, maxMinMonths, numFunds, s)
 										fmt.Printf("%v\t%v\n", s.Name(), p)
 										if print {
-											chosen := s.Choose(funds, 20, 0)
+											chosen := s.Choose(funds, 0)
 											for _, f := range chosen {
 												fmt.Println(f.Print())
 											}
