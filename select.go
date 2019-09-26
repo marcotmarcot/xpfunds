@@ -27,14 +27,15 @@ func main() {
 	for i := 0; true; i++ {
 		start := time.Now()
 		best, perf := bestInRegion(point, step)
+		if perf-bestPerf > 0.000001 {
+			bestPerf = perf
+			point = nextPoint(point, best)
+		} else {
+			best = point
+		}
 		end := time.Now()
 		fmt.Printf("%v\t%v\t%v\t%v\t%v\n", i, best, perf, end.Sub(start).String(), step)
-		if perf == bestPerf {
-			break
-		}
-		bestPerf = perf
 		step /= 2
-		point = nextPoint(point, best)
 	}
 }
 

@@ -42,11 +42,11 @@ func NewFund(monthly []float64) *Fund {
 }
 
 func (f *Fund) setFeatures() {
-	f.setReturn()
-	f.setMedian()
+	// f.setReturn()
+	// f.setMedian()
 	f.setStdDev()
 	f.setNegativeMonthRatio()
-	f.setGreatestFall()
+	// f.setGreatestFall()
 }
 
 func (f *Fund) setReturn() {
