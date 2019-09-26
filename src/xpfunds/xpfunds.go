@@ -43,10 +43,10 @@ func NewFund(monthly []float64) *Fund {
 
 func (f *Fund) setFeatures() {
 	// f.setReturn()
-	f.setMedian()
+	// f.setMedian()
 	f.setStdDev()
 	f.setNegativeMonthRatio()
-	f.setGreatestFall()
+	// f.setGreatestFall()
 }
 
 func (f *Fund) setReturn() {
@@ -139,7 +139,7 @@ func (f *Fund) setGreatestFall() {
 			gfl[end][diff] = float64(greatestFallLen)
 		}
 	}
-	f.features = append(f.features, gf) // , gfl)
+	f.features = append(f.features, gf, gfl)
 }
 
 func (f *Fund) makeRatio() {
