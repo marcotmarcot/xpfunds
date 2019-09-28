@@ -14,9 +14,12 @@ from tensorflow.keras import layers
 import numpy as np
 import scipy
 
+EVAL = 56
+
 def main():
   with open('get.tsv') as get:
-    funds = []
+    complete_data = []
+    train_data = []
     duration = 0
     for line in get:
       array = np.array(list(map(parse, line.split('\t')[5:])), dtype=float)
@@ -26,22 +29,27 @@ def main():
         array[time] = array[time] / 100 + 1
       if len(array) > duration:
         duration = len(array)
-      funds.append(array)
-  x_batch = make_features(duration, funds)
-  y_batch = make_ret(duration, funds)
-  max = y_batch.max(axis=1).sum()
-  x, y, w, loss = linear_regression(duration, len(funds))
+      complete_data.append(array)
+      train_data.append(array[EVAL:])
+  x_train = make_features(duration, train_data)
+  y_train = make_ret(duration, train_data)
+  x_eval = make_features(duration, complete_data)[-EVAL:]
+  y_eval = make_features(duration, complete_data)[-EVAL:]
+  max_train = y_train.max(axis=1).sum()
+  max_eval = y_eval.max(axis=1).sum()
+  x, y, w, loss = linear_regression(len(complete_data))
   optimizer = tf.train.GradientDescentOptimizer(0.1)
   train_op = optimizer.minimize(loss)
   with tf.Session() as session:
     session.run(tf.global_variables_initializer())
-    print(future_return(tf.convert_to_tensor(x_batch, dtype=tf.float32), tf.convert_to_tensor(y_batch, dtype=tf.float32), tf.truncated_normal([6, 1])).eval())
-    print(future_return(tf.convert_to_tensor(x_batch, dtype=tf.float32), tf.convert_to_tensor(y_batch, dtype=tf.float32), tf.zeros([6, 1])).eval())
-    feed_dict = {x: x_batch, y: y_batch}
-    for i in range(30):
+    feed_dict = {x: x_train, y: y_train}
+    for i in range(300):
       session.run(train_op, feed_dict)
-      print(i, "loss:", (-1)*loss.eval(feed_dict)/max, w.eval())
-
+    print("loss:", (-1)*loss.eval(feed_dict)/max_train)
+    print(future_return(tf.convert_to_tensor(x_eval, dtype=tf.float32), tf.convert_to_tensor(y_eval, dtype=tf.float32), tf.truncated_normal([6, 1])).eval()/max_eval)
+    print(future_return(tf.convert_to_tensor(x_eval, dtype=tf.float32), tf.convert_to_tensor(y_eval, dtype=tf.float32), tf.zeros([6, 1])).eval()/max_eval)
+    print(future_return(tf.convert_to_tensor(x_eval, dtype=tf.float32), tf.convert_to_tensor(y_eval, dtype=tf.float32), tf.convert_to_tensor([[0.15625], [0.28125], [0.8125], [-0.46875], [0], [-0.28125]])).eval()/max_eval)
+    print(future_return(tf.convert_to_tensor(x_eval, dtype=tf.float32), tf.convert_to_tensor(y_eval, dtype=tf.float32), w).eval()/max_eval)
 
 def parse(field):
   return field.replace(',', '.')
@@ -58,6 +66,7 @@ def make_features(duration, funds):
     features = np.zeros(shape=(duration, len(funds), len(feature_functions)))
     for index in range(len(feature_functions)):
       feature_functions[index](features, funds, index)
+    # features /= features.max(axis=(0, 1))
     features = (features - np.mean(features, axis=(0, 1))) / np.std(features, axis=(0, 1))
     return features
 
@@ -133,9 +142,9 @@ feature_functions = [
     set_greatest_fall_len,
 ]
 
-def linear_regression(duration, num_funds):
-  x = tf.placeholder(tf.float32, shape=(duration, num_funds, len(feature_functions)), name='x')
-  y = tf.placeholder(tf.float32, shape=(duration, num_funds, ), name='y')
+def linear_regression(num_funds):
+  x = tf.placeholder(tf.float32, shape=(None, num_funds, len(feature_functions)), name='x')
+  y = tf.placeholder(tf.float32, shape=(None, num_funds, ), name='y')
 
   with tf.variable_scope('lreg') as scope:
     w = tf.Variable(tf.truncated_normal((len(feature_functions), 1)), name='W')

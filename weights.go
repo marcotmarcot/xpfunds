@@ -43,9 +43,9 @@ func main() {
 											gf,
 											gfl,
 											-1,
-											-0.78125,
+											-1,
 										}
-										s := simulate.NewWeighted(numFunds, maxMinMonths, weight)
+										s := simulate.NewWeighted(maxMinMonths, weight)
 										p := simulate.MedianPerformance(funds, maxDuration, maxMinMonths, numFunds, s)
 										fmt.Printf("%v\t%v\n", s.Name(), p)
 										if print {
