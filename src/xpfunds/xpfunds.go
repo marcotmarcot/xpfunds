@@ -57,6 +57,9 @@ func (f *Fund) setReturn() {
 		for diff := 1; diff < len(f.monthly)-end; diff++ {
 			ret[end][diff] = ret[end][diff-1] * f.monthly[end+diff]
 		}
+		for diff := 1; diff < len(f.monthly)-end; diff++ {
+			ret[end][diff] = math.Pow(ret[end][diff], 1.0/float64(diff+1))
+		}
 	}
 	f.features = append(f.features, ret)
 }
