@@ -132,7 +132,7 @@ def set_greatest_fall_len(features, funds, index):
       if curr < greatestFall:
         greatestFall = curr
         greatestFallLen = currLen
-      features[-1-time][f][index] = greatestFallLen
+      features[-1-time][f][index] = greatestFallLen / (len(fund) - time)
 
 feature_functions = [
     set_ret,
