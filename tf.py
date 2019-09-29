@@ -15,6 +15,7 @@ import numpy as np
 import scipy
 
 EVAL = 56
+NUM_FUNDS = 5
 
 def main():
   with open('get.tsv') as get:
@@ -33,23 +34,24 @@ def main():
       train_data.append(array[EVAL:])
   x_train = make_features(duration, train_data)
   y_train = make_ret(duration, train_data)
-  x_eval = make_features(duration, complete_data)[-EVAL:]
-  y_eval = make_features(duration, complete_data)[-EVAL:]
+  x_eval = np.concatenate((np.zeros(shape=(duration-EVAL, len(complete_data), len(feature_functions))), make_features(duration, complete_data)[-EVAL:]))
+  y_eval = np.concatenate((np.zeros(shape=(duration-EVAL, len(complete_data))), make_ret(duration, complete_data)[-EVAL:]))
   max_train = y_train.max(axis=1).sum()
   max_eval = y_eval.max(axis=1).sum()
-  x, y, w, loss = linear_regression(len(complete_data))
-  optimizer = tf.train.GradientDescentOptimizer(0.1)
+  x, y, w, loss = linear_regression(duration, len(complete_data))
+  optimizer = tf.compat.v1.train.GradientDescentOptimizer(0.1)
   train_op = optimizer.minimize(loss)
-  with tf.Session() as session:
-    session.run(tf.global_variables_initializer())
+  with tf.compat.v1.Session() as session:
+    session.run(tf.compat.v1.global_variables_initializer())
     feed_dict = {x: x_train, y: y_train}
     for i in range(300):
       session.run(train_op, feed_dict)
-    print("loss:", (-1)*loss.eval(feed_dict)/max_train)
-    print(future_return(tf.convert_to_tensor(x_eval, dtype=tf.float32), tf.convert_to_tensor(y_eval, dtype=tf.float32), tf.truncated_normal([6, 1])).eval()/max_eval)
-    print(future_return(tf.convert_to_tensor(x_eval, dtype=tf.float32), tf.convert_to_tensor(y_eval, dtype=tf.float32), tf.zeros([6, 1])).eval()/max_eval)
-    print(future_return(tf.convert_to_tensor(x_eval, dtype=tf.float32), tf.convert_to_tensor(y_eval, dtype=tf.float32), tf.convert_to_tensor([[0.15625], [0.28125], [0.8125], [-0.46875], [0], [-0.28125]])).eval()/max_eval)
-    print(future_return(tf.convert_to_tensor(x_eval, dtype=tf.float32), tf.convert_to_tensor(y_eval, dtype=tf.float32), w).eval()/max_eval)
+    print("train:", (-1)*loss.eval(feed_dict)/max_train)
+    print("random_train:", future_return(tf.convert_to_tensor(x_train, dtype=tf.float32), tf.convert_to_tensor(y_train, dtype=tf.float32), tf.truncated_normal([len(feature_functions)*NUM_FUNDS, 1])).eval()/max_train)
+    print("random_eval:", future_return(tf.convert_to_tensor(x_eval, dtype=tf.float32), tf.convert_to_tensor(y_eval, dtype=tf.float32), tf.truncated_normal([len(feature_functions)*NUM_FUNDS, 1])).eval()/max_eval)
+    print("ones:", future_return(tf.convert_to_tensor(x_eval, dtype=tf.float32), tf.convert_to_tensor(y_eval, dtype=tf.float32), tf.ones([len(feature_functions)*NUM_FUNDS, 1])).eval()/max_eval)
+    print("zeros:", future_return(tf.convert_to_tensor(x_eval, dtype=tf.float32), tf.convert_to_tensor(y_eval, dtype=tf.float32), tf.zeros([len(feature_functions)*NUM_FUNDS, 1])).eval()/max_eval)
+    print("eval:", future_return(tf.convert_to_tensor(x_eval, dtype=tf.float32), tf.convert_to_tensor(y_eval, dtype=tf.float32), w).eval()/max_eval)
 
 def parse(field):
   return field.replace(',', '.')
@@ -142,20 +144,25 @@ feature_functions = [
     set_greatest_fall_len,
 ]
 
-def linear_regression(num_funds):
-  x = tf.placeholder(tf.float32, shape=(None, num_funds, len(feature_functions)), name='x')
-  y = tf.placeholder(tf.float32, shape=(None, num_funds, ), name='y')
+def linear_regression(duration, num_funds):
+  x = tf.compat.v1.placeholder(tf.float32, shape=(duration, num_funds, len(feature_functions)), name='x')
+  y = tf.compat.v1.placeholder(tf.float32, shape=(duration, num_funds, ), name='y')
 
-  with tf.variable_scope('lreg') as scope:
-    w = tf.Variable(tf.truncated_normal((len(feature_functions), 1)), name='W')
+  with tf.compat.v1.variable_scope('lreg') as scope:
+    w = tf.Variable(tf.truncated_normal((len(feature_functions)*NUM_FUNDS, 1)), name='W')
     ret = future_return(x, y, w)
 
   return x, y, w, -ret
 
 def future_return(x, y, w):
-  stock_score = tf.squeeze(tf.einsum("ijk,kl->ijl", x, w))
-  frac = tf.math.softmax(stock_score, axis=1)
-  return tf.reduce_sum(tf.multiply(frac, y))
+  total = 0
+  for i in range(NUM_FUNDS):
+    stock_score = tf.squeeze(tf.einsum("ijk,kl->ijl", x, w[i*len(feature_functions):(i+1)*len(feature_functions)]))
+    # mask = tf.argsort(stock_score, direction='DESCENDING') < 1
+    # frac = tf.divide(tf.where(tf.math.logical_not(mask), tf.where(mask, stock_score, tf.zeros_like(stock_score)), tf.ones_like(stock_score)), NUM_FUNDS)
+    frac = tf.divide(tf.math.softmax(stock_score, 1), NUM_FUNDS)
+    total += tf.reduce_sum(tf.multiply(frac, y))
+  return total
 
 if __name__ == '__main__':
   main()
